@@ -1,0 +1,160 @@
+0:Bùi Anh Tuấn
+1:Bùi Bài Bình
+2:Bằng Cường
+3:Bằng Kiều
+4:Chi Dân
+5:Châu Đăng Khoa
+6:Chí Thiện
+7:Duy Mạnh
+8:Dương Triệu Vũ
+9:Hà Anh Tuấn
+10:Hồ Trung Dũng
+11:Kim Oanh
+12:Kim Tuyến
+13:Lan Hương
+14:Lan Phương
+15:Lilly Luta
+16:Lyna Trang
+17:Lã Thanh Huyền
+18:Lê Bê La
+19:Lê Bình
+20:Lê Dương Bảo Lâm
+21:Lê Giang
+22:Lê Huỳnh Anh
+23:Lê Hạ Anh
+24:Lê Lộc
+25:Lê Thu An
+26:Lê Vũ Long
+27:Lý Hùng
+28:Lý Nhã Kỳ
+29:Lưu Quang Anh
+30:Lưu Đê Ly
+31:Lương Bích Hữu
+32:Lương Huy
+33:Lương Thanh
+34:Lệ Hằng
+35:Mai Hải Anh
+36:Mai Phương
+37:Mai Xuân Thứ
+38:Midu
+39:Minh Béo
+40:Minh Hà (MC)
+41:Minh Hương
+42:Minh Hằng
+43:Minh Luân
+44:Minh Nhí
+45:Minh Thư
+46:Mã Hiểu Đông
+47:Mạc Can
+48:Mạc Văn Khoa
+49:Mạnh Quân
+50:Mỹ Duyên
+51:Mỹ Tâm
+52:Mỹ Uyên
+53:Nam Cường
+54:Nam Em
+55:Nam Thư
+56:Nguyễn Chánh Tín
+57:Nguyễn Hậu
+58:Nguyễn Linh Nga
+59:Nguyễn Lê Việt Anh
+60:Nguyễn Phi Hùng
+61:Nguyễn Quốc Trường Thịnh
+62:Ngân Khánh
+63:Ngân Quỳnh
+64:Ngô Kiến Huy
+65:Ngô Thanh Vân
+66:Ngọc Diệp
+67:Ngọc Giàu
+68:Ngọc Hiệp
+69:Ngọc Lan
+70:Ngọc Thuận
+71:Nhan Phúc Vinh
+72:Nhung Kate
+73:Như Lê
+74:Như Quỳnh
+75:Nhật Cường
+76:Nhật Kim Anh
+77:Ninh Dương Lan Ngọc
+78:Phan Mạnh Quỳnh
+79:Phan Thị Mơ
+80:Phi Huyền Trang 
+81:Phi Nhung
+82:Phi Phụng
+83:Phi Thanh Vân
+84:Phùng Tiến Minh
+85:Phúc An
+86:Phương Anh Đào
+87:Phương Dung
+88:Phương Hằng
+89:Phương Oanh
+90:Phương Thanh
+91:Phương Trinh Jolie
+92:Phạm Tiến Lộc
+93:Phạm Toàn Thắng
+94:Phạm Trưởng
+95:Quang Hà
+96:Quang Hòa
+97:Quang Linh
+98:Quang Sự
+99:Quang Trung
+100:Quang Vinh (ca sĩ)
+101:Quyền Linh
+102:Quách Tuấn Du
+103:Quý Bình
+104:Quốc Anh
+105:Quốc Thiên
+106:Quốc Trường
+107:Quỳnh Anh Shyn
+108:Quỳnh Kool
+109:Quỳnh Lam
+110:Quỳnh Nga
+111:Sam 
+112:Song Luân
+113:Sơn Tùng M-TP
+114:Thanh Bùi
+115:Thanh Duy (ca sĩ)
+116:Thanh Hằng
+117:Thanh Lan
+118:Thanh Nam
+119:Thanh Nga
+120:Thanh Ngân
+121:Thanh Ngọc
+122:Thanh Sơn
+123:Thanh Thủy
+124:Thanh Thức
+125:Thanh Trúc
+126:Thanh Vân Hugo
+127:Thiện Tùng
+128:Thu Quỳnh
+129:Thu Trang
+130:Thành Lộc
+131:Thái Chí Hùng
+132:Thái Hoà
+133:Thùy Anh
+134:Thùy Dương (diễn viên-biên kịch)
+135:Thùy Trang
+136:Thương Tín
+137:Thạch Thu Huyền
+138:Tim Cát Vũ
+139:Trang Cherry
+140:Trung Anh
+141:Trung Dũng
+142:Trúc Nhân
+143:Trương Ngọc Ánh
+144:Trương Quốc Trầm
+145:Trương Quỳnh Anh
+146:Trương Thế Vinh
+147:Trường Giang
+148:Trường Thịnh
+149:Trấn Thành
+150:Trịnh Thăng Bình
+151:Trịnh Tú Trung
+152:Trọng Hùng
+153:Tuấn Hưng
+154:Tùng Dương
+155:Tăng Thanh Hà
+156:Tường Vi
+157:Xuan Bac
+158:Đan Trường
+159:Đen Vâu

@@ -90,6 +90,7 @@ if __name__ == "__main__":
     print(y.shape)
     print(labels)
 
+
     faceDetector = FaceDetector(
         trained_model="/home/phamvanhanh/PycharmProjects/FaceVerification/weights/mobilenet0.25_Final.pth")
     torch.set_grad_enabled(False)
@@ -101,31 +102,19 @@ if __name__ == "__main__":
     arcface_r50_asian.eval()
     arcface_r50_asian.to(device)
 
-    camera = cv2.VideoCapture(0)
-    # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
+    #camera = cv2.VideoCapture(0)
+    camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
     count =0
 
     while True:
 
         first_start = time.time()
         ret, frame = camera.read()
-        start = time.time()
-        frame = cv2.resize(frame, (800,450))
-
-        # print("Time resize: {:.4f}".format(time.time()-start))
-        # print("Capture 1 frame: {:.4f} s".format(time.time()-first_start))
-        if count % 5 ==0:
-            start1= time.time()
-            start = time.time()
-            dets = faceDetector.detect(frame)
-
-            original_img = np.copy(frame)
-
-            print("Face detection time: {}".format(time.time()-start))
-            if not ret:
-                break
-
-            num_face = 0
+        dets = faceDetector.detect(frame)
+        original_img = np.copy(frame)
+        if not ret:
+            break
+        if count % 3 ==0:
             for b in dets:
                 if b[4] < 0.6:
                     continue

@@ -1,16 +1,16 @@
 import os
 import cv2
-from models.model_irse import IR_50
 import torch
 from align.align_trans import warp_and_crop_face, get_reference_facial_points
 from argparse import ArgumentParser
 import glob
+
 import numpy as np
 from FaceDetector import FaceDetector
 from sklearn.metrics.pairwise import  cosine_similarity
-from threading import Thread
 import time
 import unidecode
+import onnxruntime as ort
 
 
 def preprocess(input_image, cpu=True):
@@ -20,12 +20,12 @@ def preprocess(input_image, cpu=True):
     img = np.transpose(img, (2, 0, 1))
     img = np.expand_dims(img, axis=0)
 
-    if cpu:
+    """    if cpu:
         model_input = torch.FloatTensor(img)
     else:
         model_input = torch.cuda.FloatTensor(img)
-
-    return model_input
+    """
+    return img
 
 
 def draw_border(img, pt1, pt2, color, thickness, r, d):
@@ -91,36 +91,40 @@ if __name__ == "__main__":
     print(labels)
 
 
-    faceDetector = FaceDetector(
-        trained_model="/home/phamvanhanh/PycharmProjects/FaceVerification/weights/mobilenet0.25_Final.pth")
+    faceDetector = FaceDetector()
+
     torch.set_grad_enabled(False)
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
-    arcface_r50_asian = IR_50([112, 112])
-    arcface_r50_asian.load_state_dict(torch.load(args.weight_path, map_location='cpu' if args.cpu else 'cuda'))
-    arcface_r50_asian.eval()
-    arcface_r50_asian.to(device)
+    arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
+    arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
+    input_name = arcface_r50_asian.get_inputs()[0].name
 
-    #camera = cv2.VideoCapture(0)
-    camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
+    camera = cv2.VideoCapture(0)
+    #camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
     count =0
 
     while True:
-
-        first_start = time.time()
         ret, frame = camera.read()
-        dets = faceDetector.detect(frame)
-        original_img = np.copy(frame)
+
         if not ret:
             break
+
         if count % 3 ==0:
+            start1 = time.time()
+            frame = cv2.resize(frame, (800, 450))
+            start = time.time()
+            dets = faceDetector.detect(frame)
+            print("Face detection Time: {:.4f}".format(time.time() - start))
+            original_img = np.copy(frame)
+
             for b in dets:
                 if b[4] < 0.6:
                     continue
 
                 start = time.time()
-                num_face +=1
+
                 score = b[4]
 
                 b = list(map(int, b))
@@ -135,8 +139,12 @@ if __name__ == "__main__":
 
                 start = time.time()
                 model_input = preprocess(warped_face2)
-                embedding = arcface_r50_asian(model_input)
-                embedding = embedding.detach().numpy()
+                embedding = arcface_r50_asian.run(None, {input_name: model_input})
+                embedding = np.array(embedding)
+                embedding = np.squeeze(embedding, axis=0)
+
+                # embedding = np.expand_dims(embedding, axis=0)
+                # embedding = embedding.detach().numpy()
                 print("Embedding time: {}".format(time.time()-start))
 
                 cosins = cosine_similarity(embedding, X)
@@ -158,7 +166,7 @@ if __name__ == "__main__":
             print("1 frames: {:.4f}".format(time.time()-start1))
 
             cv2.imshow('frame', frame)
-            print("Total Faces: {}".format(num_face))
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 

@@ -50,9 +50,9 @@ def load_model(model, pretrained_path, load_to_cpu):
 
 
 class FaceDetector:
-    def __init__(self, trained_model='./weights/mobilenet0.25_Final.pth', network='mobile0.25', cpu=True,
+    def __init__(self, network='mobile0.25', cpu=True,
                  confidence_threshold=0.02, top_k=5000, nms_threshold=0.4, keep_top_k=750, vis_thres=0.6):
-        self.trained_model = trained_model
+
         self.network = network
         self.network = network
         self.cpu = cpu

@@ -5,3 +5,4 @@ weights
 *.pyc
 .idea/
 *.pyc
+*.zip

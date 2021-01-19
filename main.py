@@ -95,7 +95,7 @@ if __name__ == "__main__":
     arcface_r50_asian.eval()
     arcface_r50_asian.to(device)
 
-    camera = cv2.VideoCapture(1)
+    camera = cv2.VideoCapture(0)
     count =0
     while True:
         ret, frame = camera.read()
@@ -103,42 +103,39 @@ if __name__ == "__main__":
         original_img = np.copy(frame)
         if not ret:
             break
-        if count % 3 ==0:
-            for b in dets:
-                if b[4] < 0.6:
-                    continue
-                score = b[4]
-                b = list(map(int, b))
-                top_left = (b[0], b[1])
-                bottom_right = (b[2], b[3])
 
-                landmarks = [[b[2 * i - 1], b[2 * i]] for i in range(3, 8)]
-                warped_face2 = warp_and_crop_face(
-                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
+        for b in dets:
+            if b[4] < 0.6:
+                continue
+            score = b[4]
+            b = list(map(int, b))
+            top_left = (b[0], b[1])
+            bottom_right = (b[2], b[3])
+
+            landmarks = [[b[2 * i - 1], b[2 * i]] for i in range(3, 8)]
+            warped_face2 = warp_and_crop_face(
+                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
                     (112, 112))
+            model_input = preprocess(warped_face2)
+            embedding = arcface_r50_asian(model_input)
+            embedding = embedding.detach().numpy()
 
-                model_input = preprocess(warped_face2)
-                embedding = arcface_r50_asian(model_input)
-                embedding = embedding.detach().numpy()
+            cosins = cosine_similarity(embedding, X)
+            idx = np.argmax(cosins)
+            if cosins[0, idx] <= 0.3:
+                name = "unknown"
+            else:
+                label = int(y[idx])
+                name = labels[label]
 
-                cosins = cosine_similarity(embedding, X)
-                idx = np.argmax(cosins)
-                if cosins[0, idx] <= 0.3:
-                    name = "unknown"
-                else:
-                    label = int(y[idx])
-                    name = labels[label]
+            cx = b[0]
+            cy = b[1] + 12
 
-                cx = b[0]
-                cy = b[1] + 12
-
-                text = "{} {:.2f}".format(name, score)
-                # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
-                draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
-                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
-        else:
+            text = "{} {:.2f}".format(name, score)
+            # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
             draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
             cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
+
 
         count+=1
         cv2.imshow('frame', frame)

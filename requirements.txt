@@ -11,3 +11,4 @@ sklearn==0.0
 scikit-learn==0.23.2
 tqdm==4.51.0
 matplotlib==3.3.2
+Unidecode==1.1.2

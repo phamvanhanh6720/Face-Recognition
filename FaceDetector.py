@@ -6,11 +6,10 @@ import numpy as np
 from data import cfg_mnet, cfg_re50
 from layers.functions.prior_box import PriorBox
 from utils.nms.py_cpu_nms import py_cpu_nms
-import cv2
 from models.retinaface import RetinaFace
 from utils.box_utils import decode, decode_landm
 import time
-
+import onnxruntime as ort
 
 def check_keys(model, pretrained_state_dict):
     ckpt_keys = set(pretrained_state_dict.keys())
@@ -63,7 +62,10 @@ class FaceDetector:
         self.keep_top_k = keep_top_k
         self.vis_thres = vis_thres
 
-        torch.set_grad_enabled(False)
+        onnx_path = os.path.join("./weights/FaceDetector.onnx")
+        self.ort_session = ort.InferenceSession(onnx_path)
+        self.input_name = self.ort_session.get_inputs()[0].name
+
         self.cfg = None
         if self.network == "mobile0.25":
             setattr(self, 'cfg', cfg_mnet)
@@ -72,16 +74,18 @@ class FaceDetector:
         else:
             raise (Exception("Invalid NetWork"))
         self.cfg["pretrain"] = False
+        self.resize = 1
 
+        self.device = torch.device("cpu" if self.cpu else "cuda")
+
+        """        
+        torch.set_grad_enabled(False)
         # build net and load model
         self.net = RetinaFace(self.cfg, phase='test')
         self.net = load_model(self.net, self.trained_model, self.cpu)
         self.net = self.net.eval()
-
-        self.device = torch.device("cpu" if self.cpu else "cuda")
         self.net = self.net.to(self.device)
-        self.resize = 1
-
+        """
 
     def detect(self, image_raw):
         """
@@ -98,13 +102,17 @@ class FaceDetector:
         scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
         img -= (104, 117, 123)
         img = img.transpose(2, 0, 1)
-        img = torch.from_numpy(img).unsqueeze(0)
-        img = img.to(self.device)
-        scale = scale.to(self.device)
+        img = np.expand_dims(img, axis=0)
 
         tic = time.time()
-        loc, conf, landms = self.net(img)  # forward pass
+        loc, conf, landms = self.ort_session.run(None, {self.input_name: img})  # forward pass
         # print('net forward time: {:.4f}'.format(time.time() - tic))
+        # convert ndarray to tensor pytorch
+        loc = torch.from_numpy(loc)
+        loc = loc.to(self.device)
+        # conf = conf.to(self.device)
+        landms = torch.from_numpy(landms)
+        landms = landms.to(self.device)
 
         priorbox = PriorBox(self.cfg, image_size=(im_height, im_width))
         priors = priorbox.forward()
@@ -113,7 +121,8 @@ class FaceDetector:
         boxes = decode(loc.data.squeeze(0), prior_data, self.cfg['variance'])
         boxes = boxes * scale / self.resize
         boxes = boxes.cpu().numpy()
-        scores = conf.squeeze(0).data.cpu().numpy()[:, 1]
+        # scores = conf.squeeze(0).data.cpu().numpy()[:, 1]
+        scores = np.squeeze(conf, axis=0)[:, 1]
         landms = decode_landm(landms.data.squeeze(0), prior_data, self.cfg['variance'])
         scale1 = torch.Tensor([img.shape[3], img.shape[2], img.shape[3], img.shape[2],
                                    img.shape[3], img.shape[2], img.shape[3], img.shape[2],

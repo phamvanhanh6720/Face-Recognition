@@ -9,6 +9,8 @@ import numpy as np
 from FaceDetector import FaceDetector
 from sklearn.metrics.pairwise import  cosine_similarity
 from threading import Thread
+import time
+import unidecode
 
 
 def preprocess(input_image, cpu=True):
@@ -24,6 +26,7 @@ def preprocess(input_image, cpu=True):
         model_input = torch.cuda.FloatTensor(img)
 
     return model_input
+
 
 def draw_border(img, pt1, pt2, color, thickness, r, d):
     x1, y1 = int(pt1[0]), int(pt1[1])
@@ -49,6 +52,7 @@ def draw_border(img, pt1, pt2, color, thickness, r, d):
     cv2.line(img, (x2, y2 - r), (x2, y2 - r - d), color, thickness)
     cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness)
 
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
@@ -62,7 +66,10 @@ if __name__ == "__main__":
     try:
         with open(args.label, 'r') as file:
             for line in file.readlines():
-                name, l = line.split(" ")[0:2]
+                idx = [i for i in range(len(line)) if line[i]==" "]
+                name = line[: idx[-1]]
+                l = line[idx[-1]:]
+
                 l = int(l.split("\n")[0])
                 labels[l] = name
     except Exception as e:
@@ -83,7 +90,6 @@ if __name__ == "__main__":
     print(y.shape)
     print(labels)
 
-
     faceDetector = FaceDetector(
         trained_model="/home/phamvanhanh/PycharmProjects/FaceVerification/weights/mobilenet0.25_Final.pth")
     torch.set_grad_enabled(False)
@@ -96,51 +102,81 @@ if __name__ == "__main__":
     arcface_r50_asian.to(device)
 
     camera = cv2.VideoCapture(0)
+    # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
     count =0
+
     while True:
+
+        first_start = time.time()
         ret, frame = camera.read()
-        dets = faceDetector.detect(frame)
-        original_img = np.copy(frame)
-        if not ret:
-            break
+        start = time.time()
+        frame = cv2.resize(frame, (800,450))
 
-        for b in dets:
-            if b[4] < 0.6:
-                continue
-            score = b[4]
-            b = list(map(int, b))
-            top_left = (b[0], b[1])
-            bottom_right = (b[2], b[3])
+        # print("Time resize: {:.4f}".format(time.time()-start))
+        # print("Capture 1 frame: {:.4f} s".format(time.time()-first_start))
+        if count % 5 ==0:
+            start1= time.time()
+            start = time.time()
+            dets = faceDetector.detect(frame)
 
-            landmarks = [[b[2 * i - 1], b[2 * i]] for i in range(3, 8)]
-            warped_face2 = warp_and_crop_face(
-                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
+            original_img = np.copy(frame)
+
+            print("Face detection time: {}".format(time.time()-start))
+            if not ret:
+                break
+
+            num_face = 0
+            for b in dets:
+                if b[4] < 0.6:
+                    continue
+
+                start = time.time()
+                num_face +=1
+                score = b[4]
+
+                b = list(map(int, b))
+                top_left = (b[0], b[1])
+                bottom_right = (b[2], b[3])
+
+                landmarks = [[b[2 * i - 1], b[2 * i]] for i in range(3, 8)]
+                warped_face2 = warp_and_crop_face(
+                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
                     (112, 112))
-            model_input = preprocess(warped_face2)
-            embedding = arcface_r50_asian(model_input)
-            embedding = embedding.detach().numpy()
+                print("Alignment Time: {}".format(time.time()-start))
 
-            cosins = cosine_similarity(embedding, X)
-            idx = np.argmax(cosins)
-            if cosins[0, idx] <= 0.3:
-                name = "unknown"
-            else:
-                label = int(y[idx])
-                name = labels[label]
+                start = time.time()
+                model_input = preprocess(warped_face2)
+                embedding = arcface_r50_asian(model_input)
+                embedding = embedding.detach().numpy()
+                print("Embedding time: {}".format(time.time()-start))
 
-            cx = b[0]
-            cy = b[1] + 12
+                cosins = cosine_similarity(embedding, X)
+                idx = np.argmax(cosins)
+                cosin = cosins[0, idx]
+                if cosin <= 0.35:
+                    name = "unknown"
+                else:
+                    label = int(y[idx])
+                    name = unidecode.unidecode(labels[label])
 
-            text = "{} {:.2f}".format(name, score)
-            # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
-            draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
-            cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
+                cx = b[0]
+                cy = b[1] + 12
+                text = "{} {:.2f}".format(name, cosin)
+                # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
+                draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
+                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
 
+            print("1 frames: {:.4f}".format(time.time()-start1))
 
-        count+=1
-        cv2.imshow('frame', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            cv2.imshow('frame', frame)
+            print("Total Faces: {}".format(num_face))
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        count +=1
+        if count > 10000:
+            count = 0
+
 
     camera.release()
     cv2.destroyWindow("frame")

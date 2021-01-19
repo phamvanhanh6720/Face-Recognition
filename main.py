@@ -12,6 +12,7 @@ from threading import Thread
 import time
 import unidecode
 
+
 def preprocess(input_image, cpu=True):
     img = np.float32(input_image / 255.)
     img = (img - 0.5) / 0.5
@@ -25,6 +26,7 @@ def preprocess(input_image, cpu=True):
         model_input = torch.cuda.FloatTensor(img)
 
     return model_input
+
 
 def draw_border(img, pt1, pt2, color, thickness, r, d):
     x1, y1 = int(pt1[0]), int(pt1[1])
@@ -49,6 +51,7 @@ def draw_border(img, pt1, pt2, color, thickness, r, d):
     cv2.line(img, (x2 - r, y2), (x2 - r - d, y2), color, thickness)
     cv2.line(img, (x2, y2 - r), (x2, y2 - r - d), color, thickness)
     cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness)
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()

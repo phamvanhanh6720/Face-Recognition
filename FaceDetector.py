@@ -50,7 +50,7 @@ def load_model(model, pretrained_path, load_to_cpu):
 
 
 class FaceDetector:
-    def __init__(self, network='mobile0.25', cpu=True,
+    def __init__(self, onnx_path = "./weights/FaceDetector.onnx", network='mobile0.25', cpu=True,
                  confidence_threshold=0.02, top_k=5000, nms_threshold=0.4, keep_top_k=750, vis_thres=0.6):
 
         self.network = network
@@ -62,7 +62,6 @@ class FaceDetector:
         self.keep_top_k = keep_top_k
         self.vis_thres = vis_thres
 
-        onnx_path = os.path.join("./weights/FaceDetector.onnx")
         self.ort_session = ort.InferenceSession(onnx_path)
         self.input_name = self.ort_session.get_inputs()[0].name
 
@@ -78,14 +77,6 @@ class FaceDetector:
 
         self.device = torch.device("cpu" if self.cpu else "cuda")
 
-        """        
-        torch.set_grad_enabled(False)
-        # build net and load model
-        self.net = RetinaFace(self.cfg, phase='test')
-        self.net = load_model(self.net, self.trained_model, self.cpu)
-        self.net = self.net.eval()
-        self.net = self.net.to(self.device)
-        """
 
     def detect(self, image_raw):
         """

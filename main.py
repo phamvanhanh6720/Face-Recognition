@@ -12,6 +12,11 @@ import time
 import unidecode
 import onnxruntime as ort
 
+from datetime import datetime
+import warnings
+# Turn off warnming
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 def preprocess(input_image, cpu=True):
     img = np.float32(input_image / 255.)
@@ -20,11 +25,6 @@ def preprocess(input_image, cpu=True):
     img = np.transpose(img, (2, 0, 1))
     img = np.expand_dims(img, axis=0)
 
-    """    if cpu:
-        model_input = torch.FloatTensor(img)
-    else:
-        model_input = torch.cuda.FloatTensor(img)
-    """
     return img
 
 
@@ -91,17 +91,25 @@ if __name__ == "__main__":
     print(labels)
 
 
-    faceDetector = FaceDetector()
+    faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
 
     torch.set_grad_enabled(False)
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
+    # arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
     arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 
-    camera = cv2.VideoCapture(0)
+    camera = cv2.VideoCapture()
+    camera.open(2, apiPreference=cv2.CAP_V4L2)
+
+    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    camera.set(cv2.CAP_PROP_FPS, 30.0)
+
     #camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
     count =0
 
@@ -112,18 +120,17 @@ if __name__ == "__main__":
             break
 
         if count % 3 ==0:
-            start1 = time.time()
-            frame = cv2.resize(frame, (800, 450))
-            start = time.time()
+            # start1 = time.time()
+            # frame = cv2.resize(frame, (800, 450))
+            frame = cv2.resize(frame, (640, 480))
+            # start = time.time()
             dets = faceDetector.detect(frame)
-            print("Face detection Time: {:.4f}".format(time.time() - start))
+            # print("Face detection Time: {:.4f}".format(time.time() - start))
             original_img = np.copy(frame)
 
             for b in dets:
                 if b[4] < 0.6:
                     continue
-
-                start = time.time()
 
                 score = b[4]
 
@@ -135,17 +142,13 @@ if __name__ == "__main__":
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
                     (112, 112))
-                print("Alignment Time: {}".format(time.time()-start))
 
-                start = time.time()
+                # start = time.time()
                 model_input = preprocess(warped_face2)
                 embedding = arcface_r50_asian.run(None, {input_name: model_input})
                 embedding = np.array(embedding)
                 embedding = np.squeeze(embedding, axis=0)
-
-                # embedding = np.expand_dims(embedding, axis=0)
-                # embedding = embedding.detach().numpy()
-                print("Embedding time: {}".format(time.time()-start))
+                # print("Embedding time: {}".format(time.time()-start))
 
                 cosins = cosine_similarity(embedding, X)
                 idx = np.argmax(cosins)
@@ -155,15 +158,16 @@ if __name__ == "__main__":
                 else:
                     label = int(y[idx])
                     name = unidecode.unidecode(labels[label])
+                    print(datetime.fromtimestamp(time.time()),  ": " + name )
 
                 cx = b[0]
                 cy = b[1] + 12
                 text = "{} {:.2f}".format(name, cosin)
                 # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
                 draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
-                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
+                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
 
-            print("1 frames: {:.4f}".format(time.time()-start1))
+            # print("1 frames: {:.4f}".format(time.time()-start1))
 
             cv2.imshow('frame', frame)
 

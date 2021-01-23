@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     reference = get_reference_facial_points(default_square=True)
-    labels = dict()
+    all_labels = dict()
     try:
         with open(args.label, 'r') as file:
             for line in file.readlines():
@@ -71,7 +71,7 @@ if __name__ == "__main__":
                 l = line[idx[-1]:]
 
                 l = int(l.split("\n")[0])
-                labels[l] = name
+                all_labels[l] = name
     except Exception as e:
         print(e)
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     y = np.concatenate(y, axis=0)
     print(X.shape)
     print(y.shape)
-    print(labels)
+    print(all_labels)
 
 
     faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
@@ -103,14 +103,14 @@ if __name__ == "__main__":
     input_name = arcface_r50_asian.get_inputs()[0].name
 
     camera = cv2.VideoCapture()
-    camera.open(2, apiPreference=cv2.CAP_V4L2)
+    camera.open(1, apiPreference=cv2.CAP_V4L2)
 
     camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     camera.set(cv2.CAP_PROP_FPS, 30.0)
 
-    #camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
+    # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
     count =0
 
     while True:
@@ -119,55 +119,82 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        if count % 3 ==0:
+        if count % 4 ==0:
             # start1 = time.time()
-            # frame = cv2.resize(frame, (800, 450))
             frame = cv2.resize(frame, (640, 480))
+            # frame = cv2.resize(frame, (640, 480))
             # start = time.time()
             dets = faceDetector.detect(frame)
             # print("Face detection Time: {:.4f}".format(time.time() - start))
             original_img = np.copy(frame)
 
+            batch = []  # contain all facial of an image
+            coordinates = []
+            labels = [] # labels of all facial in an image
+            scores = []
+            save_imgs = []
+
             for b in dets:
                 if b[4] < 0.6:
                     continue
 
-                score = b[4]
-
+                score = b[4]  # confidence of a bounding box
                 b = list(map(int, b))
-                top_left = (b[0], b[1])
-                bottom_right = (b[2], b[3])
+                coordinates.append((b[0], b[1], b[2], b[3])) # x1, y1, x2, y2
 
                 landmarks = [[b[2 * i - 1], b[2 * i]] for i in range(3, 8)]
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
                     (112, 112))
+                save_imgs.append(warped_face2)
 
                 # start = time.time()
                 model_input = preprocess(warped_face2)
-                embedding = arcface_r50_asian.run(None, {input_name: model_input})
+                batch.append(model_input)
+
+            if batch != []:
+
+                batch = np.concatenate(batch, axis=0)
+                # start = time.time()
+                embedding = arcface_r50_asian.run(None, {input_name: batch})
+
                 embedding = np.array(embedding)
                 embedding = np.squeeze(embedding, axis=0)
                 # print("Embedding time: {}".format(time.time()-start))
 
-                cosins = cosine_similarity(embedding, X)
-                idx = np.argmax(cosins)
-                cosin = cosins[0, idx]
-                if cosin <= 0.35:
-                    name = "unknown"
-                else:
-                    label = int(y[idx])
-                    name = unidecode.unidecode(labels[label])
-                    print(datetime.fromtimestamp(time.time()),  ": " + name )
+                similarity = cosine_similarity(embedding, X)
+                # print(similarity.shape)
+                idx = np.argmax(similarity, axis=-1)
+                temp = range(0, len(similarity))
+                cosins = similarity[temp, idx]
+                # print(cosins.shape)
+                scores = cosins
 
-                cx = b[0]
-                cy = b[1] + 12
-                text = "{} {:.2f}".format(name, cosin)
-                # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
-                draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
-                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
+                for i in range(len(cosins)):
+                    if cosins[i] <= 0.4:
+                        name = "unknown"
+                    else:
+                        label = int(y[idx[i]])
+                        name = unidecode.unidecode(all_labels[label])
+                        print(datetime.fromtimestamp(time.time()),  ": " + name )
 
-            # print("1 frames: {:.4f}".format(time.time()-start1))
+                    labels.append(name)
+
+            # coordinates, lables have the same size
+            for i in range(len(labels)):
+                    cx = coordinates[i][0]
+                    cy = coordinates[i][1] + 12
+                    text = "{} {:.2f}".format(labels[i], scores[i])
+                    # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
+                    draw_border(frame, (coordinates[i][0], coordinates[i][1]), (coordinates[i][2], coordinates[i][3]), (0, 0, 255), 2, 7, 10)
+                    cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
+                    filename = labels[i] + " {:.2f} ".format(scores[i]) + str(time.time()) + ".jpg"
+
+                    if labels[i] != "unknown":
+                        cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[i], cv2.COLOR_RGB2BGR))
+
+
+                # print("1 frames: {:.4f}".format(time.time()-start1))
 
             cv2.imshow('frame', frame)
 

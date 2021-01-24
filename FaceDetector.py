@@ -76,6 +76,14 @@ class FaceDetector:
 
         self.device = torch.device("cpu" if self.cpu else "cuda")
 
+        """        
+        torch.set_grad_enabled(False)
+        # build net and load model
+        self.net = RetinaFace(self.cfg, phase='test')
+        self.net = load_model(self.net, self.trained_model, self.cpu)
+        self.net = self.net.eval()
+        self.net = self.net.to(self.device)
+        """
 
     def detect(self, image_raw):
         """

@@ -22,15 +22,16 @@ def check_image(image):
 if __name__ == '__main__':
     device_id = 0
     model_dir = './resources/anti_spoof_models'
-    model_test = AntiSpoofPredict(device_id)
+    model_test = AntiSpoofPredict(cpu=True, device_id=device_id)
     image_cropper = CropImage()
     count = 0
-    camera = cv2.VideoCapture(1)
-    # camera = cv2.VideoCapture('http://192.168.0.102:4747/video')
+    # camera = cv2.VideoCapture(1)
+    url_http = 'http://admin:dslabneu8@192.168.1.12:80/ISAPI/Streaming/channels/102/httppreview'
+    camera = cv2.VideoCapture(url_http)
 
     while True:
         ret, image = camera.read()
-        print(image.shape)
+
         image = cv2.resize(image, (image.shape[0], image.shape[1]))
         print(check_image(image))
         image_bbox = model_test.get_bbox(image)

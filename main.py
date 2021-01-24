@@ -92,28 +92,30 @@ if __name__ == "__main__":
     print(y.shape)
     print(all_labels)
 
+
     faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
     image_cropper = CropImage()
     model_dir = './resources/anti_spoof_models'
-    model_test = AntiSpoofPredict(0)
+    model_test = AntiSpoofPredict(cpu= True, device_id=0)
     label = 1
 
     torch.set_grad_enabled(False)
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
+    # arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
     arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
-
-    camera = cv2.VideoCapture(1)
-    # camera.open(1, apiPreference=cv2.CAP_V4L2)
-    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
-    camera.set(cv2.CAP_PROP_FPS, 30.0)
-
-    # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
+    """
+        camera = cv2.VideoCapture(1)
+        # camera.open(1, apiPreference=cv2.CAP_V4L2)
+        camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
+        camera.set(cv2.CAP_PROP_FPS, 30.0)"""
+    url_http = 'http://admin:dslabneu8@192.168.1.12:80/ISAPI/Streaming/channels/102/httppreview'
+    camera = cv2.VideoCapture(url_http)
     count =0
 
     while True:
@@ -124,7 +126,7 @@ if __name__ == "__main__":
 
         if count % 4 ==0:
             # start1 = time.time()
-            frame = cv2.resize(frame, (480, 640))
+            frame = cv2.resize(frame, (640, 480))
             # frame = cv2.resize(frame, (640, 480))
 
             start = time.time()
@@ -247,4 +249,4 @@ if __name__ == "__main__":
 
 
     camera.release()
-    cv2.destroyWindow("frame")
+    cv2.destroyAllWindows()

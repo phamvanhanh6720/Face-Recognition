@@ -4,7 +4,9 @@ import torch
 from align.align_trans import warp_and_crop_face, get_reference_facial_points
 from argparse import ArgumentParser
 import glob
-
+from src.generate_patches import CropImage
+from src.utility import parse_model_name
+from src.anti_spoof_predict import AntiSpoofPredict
 import numpy as np
 from FaceDetector import FaceDetector
 from sklearn.metrics.pairwise import  cosine_similarity
@@ -64,7 +66,7 @@ if __name__ == "__main__":
     reference = get_reference_facial_points(default_square=True)
     all_labels = dict()
     try:
-        with open(args.label, 'r') as file:
+        with open(args.label, 'r', encoding='utf-8') as file:
             for line in file.readlines():
                 idx = [i for i in range(len(line)) if line[i]==" "]
                 name = line[: idx[-1]]
@@ -90,24 +92,25 @@ if __name__ == "__main__":
     print(y.shape)
     print(all_labels)
 
-
     faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
+    image_cropper = CropImage()
+    model_dir = './resources/anti_spoof_models'
+    model_test = AntiSpoofPredict(0)
+    label = 1
 
     torch.set_grad_enabled(False)
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
-    # arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
     arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 
-    camera = cv2.VideoCapture()
-    camera.open(1, apiPreference=cv2.CAP_V4L2)
-
+    camera = cv2.VideoCapture(1)
+    # camera.open(1, apiPreference=cv2.CAP_V4L2)
     camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
     camera.set(cv2.CAP_PROP_FPS, 30.0)
 
     # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
@@ -121,11 +124,12 @@ if __name__ == "__main__":
 
         if count % 4 ==0:
             # start1 = time.time()
-            frame = cv2.resize(frame, (640, 480))
+            frame = cv2.resize(frame, (480, 640))
             # frame = cv2.resize(frame, (640, 480))
-            # start = time.time()
+
+            start = time.time()
             dets = faceDetector.detect(frame)
-            # print("Face detection Time: {:.4f}".format(time.time() - start))
+            print("Face detection Time: {:.4f}".format(time.time() - start))
             original_img = np.copy(frame)
 
             batch = []  # contain all facial of an image
@@ -139,6 +143,7 @@ if __name__ == "__main__":
                     continue
 
                 score = b[4]  # confidence of a bounding box
+                # print(image_bbox, b[:4])
                 b = list(map(int, b))
                 coordinates.append((b[0], b[1], b[2], b[3])) # x1, y1, x2, y2
 
@@ -154,13 +159,36 @@ if __name__ == "__main__":
 
             if batch != []:
 
+                start = time.time()
+                image_bbox = model_test.get_bbox(frame)
+                prediction = np.zeros((1, 3))
+                test_speed = 0
+                for model_name in os.listdir(model_dir):
+                    h_input, w_input, model_type, scale = parse_model_name(model_name)
+                    param = {
+                        "org_img": frame,
+                        "bbox": image_bbox,
+                        "scale": scale,
+                        "out_w": w_input,
+                        "out_h": h_input,
+                        "crop": True,
+                    }
+                    if scale is None:
+                        param["crop"] = False
+                    img = image_cropper.crop(**param)
+                    start = time.time()
+                    prediction += model_test.predict(img, os.path.join(model_dir, model_name))
+                    test_speed += time.time() - start
+                label = np.argmax(prediction)
+                print("Anti Spoofing Time: {:.4f}".format(time.time() - start))
+
                 batch = np.concatenate(batch, axis=0)
-                # start = time.time()
+                start = time.time()
                 embedding = arcface_r50_asian.run(None, {input_name: batch})
 
                 embedding = np.array(embedding)
                 embedding = np.squeeze(embedding, axis=0)
-                # print("Embedding time: {}".format(time.time()-start))
+                print("Embedding time: {}".format(time.time()-start))
 
                 similarity = cosine_similarity(embedding, X)
                 # print(similarity.shape)
@@ -180,19 +208,31 @@ if __name__ == "__main__":
 
                     labels.append(name)
 
-            # coordinates, lables have the same size
-            for i in range(len(labels)):
-                    cx = coordinates[i][0]
-                    cy = coordinates[i][1] + 12
-                    text = "{} {:.2f}".format(labels[i], scores[i])
-                    # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
-                    draw_border(frame, (coordinates[i][0], coordinates[i][1]), (coordinates[i][2], coordinates[i][3]), (0, 0, 255), 2, 7, 10)
-                    cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
-                    filename = labels[i] + " {:.2f} ".format(scores[i]) + str(time.time()) + ".jpg"
+                # get max box
+                max_i = -1
+                max_area = 0
+                for i in range(len(labels)):
+                    area = (coordinates[i][2] - coordinates[i][0]) * (coordinates[i][3] - coordinates[i][1])
+                    if area > max_area:
+                        max_area = area
+                        max_i = i
 
-                    if labels[i] != "unknown":
-                        cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[i], cv2.COLOR_RGB2BGR))
+                # print largest face
+                cx = coordinates[max_i][0]
+                cy = coordinates[max_i][1] + 12
+                text = "{} {:.2f}".format(labels[max_i], scores[max_i])
+                # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
+                if label == 1:
+                    draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
+                                (coordinates[max_i][2], coordinates[max_i][3]), (0, 128, 0), 2, 7, 10)
+                else:
+                    draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
+                                (coordinates[max_i][2], coordinates[max_i][3]), (0, 0, 255), 2, 7, 10)
+                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
+                filename = labels[max_i] + " {:.2f} ".format(scores[max_i]) + str(time.time()) + ".jpg"
 
+                if labels[max_i] != "unknown":
+                    cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[max_i], cv2.COLOR_RGB2BGR))
 
                 # print("1 frames: {:.4f}".format(time.time()-start1))
 

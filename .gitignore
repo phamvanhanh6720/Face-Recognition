@@ -4,4 +4,5 @@ dataset
 weights
 *.pyc
 .idea/
-
+*.zip
+*.cpython-38.pyc

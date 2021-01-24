@@ -38,7 +38,7 @@ def get_lable(label_file, name):
 if __name__ == '__main__':
 
     parser = ArgumentParser(description="get all embeddings dataset")
-    parser.add_argument("-weight_path", "--weight_path", default="./weights/backbone_ir50_asia.pth", type=str)
+    parser.add_argument("-weight_path", "--weight_path", default="./weights/backbone_ir50_ms1m_epoch120.pth", type=str)
     parser.add_argument("-cpu", "--cpu", default=True, type=bool)
     parser.add_argument("-crop_size", "--crop_size", default=112, type=int)
     parser.add_argument("-default_root", "--default_root", default= "./dataset/images", type=str)
@@ -85,7 +85,7 @@ if __name__ == '__main__':
         embeddings = np.array(embeddings)
         print(embeddings.shape)
 
-        np.savez("./dataset/embeddings/" + str(label) + ".npz", embeddings, labels)
+        np.savez("./dataset/embeddings1/" + str(label) + ".npz", embeddings, labels)
 
     else:
         folders = os.listdir(args.aligned_dataset)
@@ -127,7 +127,7 @@ if __name__ == '__main__':
             embeddings = np.array(embeddings)
             print(embeddings.shape)
 
-            np.savez("./dataset/embeddings/" + str(la) + ".npz", embeddings, labels)
+            np.savez("./dataset/embeddings1/" + str(la) + ".npz", embeddings, labels)
 
 
 

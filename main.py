@@ -1,16 +1,23 @@
 import os
 import cv2
-from models.model_irse import IR_50
 import torch
 from align.align_trans import warp_and_crop_face, get_reference_facial_points
 from argparse import ArgumentParser
 import glob
+from src.generate_patches import CropImage
+from src.utility import parse_model_name
+from src.anti_spoof_predict import AntiSpoofPredict
 import numpy as np
 from FaceDetector import FaceDetector
 from sklearn.metrics.pairwise import  cosine_similarity
-from threading import Thread
 import time
 import unidecode
+import onnxruntime as ort
+
+from datetime import datetime
+import warnings
+# Turn off warnming
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def preprocess(input_image, cpu=True):
@@ -20,12 +27,7 @@ def preprocess(input_image, cpu=True):
     img = np.transpose(img, (2, 0, 1))
     img = np.expand_dims(img, axis=0)
 
-    if cpu:
-        model_input = torch.FloatTensor(img)
-    else:
-        model_input = torch.cuda.FloatTensor(img)
-
-    return model_input
+    return img
 
 
 def draw_border(img, pt1, pt2, color, thickness, r, d):
@@ -62,16 +64,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     reference = get_reference_facial_points(default_square=True)
-    labels = dict()
+    all_labels = dict()
     try:
-        with open(args.label, 'r') as file:
+        with open(args.label, 'r', encoding='utf-8') as file:
             for line in file.readlines():
                 idx = [i for i in range(len(line)) if line[i]==" "]
                 name = line[: idx[-1]]
                 l = line[idx[-1]:]
 
                 l = int(l.split("\n")[0])
-                labels[l] = name
+                all_labels[l] = name
     except Exception as e:
         print(e)
 
@@ -88,88 +90,156 @@ if __name__ == "__main__":
     y = np.concatenate(y, axis=0)
     print(X.shape)
     print(y.shape)
-    print(labels)
+    print(all_labels)
 
-    faceDetector = FaceDetector(
-        trained_model="/home/phamvanhanh/PycharmProjects/FaceVerification/weights/mobilenet0.25_Final.pth")
+
+    faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
+    image_cropper = CropImage()
+    model_dir = './resources/anti_spoof_models'
+    model_test = AntiSpoofPredict(cpu= True, device_id=0)
+    label = 1
+
     torch.set_grad_enabled(False)
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
-    arcface_r50_asian = IR_50([112, 112])
-    arcface_r50_asian.load_state_dict(torch.load(args.weight_path, map_location='cpu' if args.cpu else 'cuda'))
-    arcface_r50_asian.eval()
-    arcface_r50_asian.to(device)
-
-    #camera = cv2.VideoCapture(0)
-    camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
+    # arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
+    arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
+    arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
+    input_name = arcface_r50_asian.get_inputs()[0].name
+    """
+        camera = cv2.VideoCapture(1)
+        # camera.open(1, apiPreference=cv2.CAP_V4L2)
+        camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
+        camera.set(cv2.CAP_PROP_FPS, 30.0)"""
+    url_http = 'http://admin:dslabneu8@192.168.1.12:80/ISAPI/Streaming/channels/102/httppreview'
+    camera = cv2.VideoCapture(url_http)
     count =0
 
     while True:
-
-        first_start = time.time()
         ret, frame = camera.read()
-        start = time.time()
-        frame = cv2.resize(frame, (640,480))
 
-        # print("Time resize: {:.4f}".format(time.time()-start))
-        # print("Capture 1 frame: {:.4f} s".format(time.time()-first_start))
-        if count % 5 ==0:
-            start1= time.time()
+        if not ret:
+            break
+
+        if count % 4 ==0:
+            # start1 = time.time()
+            frame = cv2.resize(frame, (640, 480))
+            # frame = cv2.resize(frame, (640, 480))
+
             start = time.time()
             dets = faceDetector.detect(frame)
-
+            print("Face detection Time: {:.4f}".format(time.time() - start))
             original_img = np.copy(frame)
 
-            print("Face detection time: {}".format(time.time()-start))
-            if not ret:
-                break
+            batch = []  # contain all facial of an image
+            coordinates = []
+            labels = [] # labels of all facial in an image
+            scores = []
+            save_imgs = []
 
-            num_face = 0
             for b in dets:
                 if b[4] < 0.6:
                     continue
 
-                start = time.time()
-                num_face +=1
-                score = b[4]
-
+                score = b[4]  # confidence of a bounding box
+                # print(image_bbox, b[:4])
                 b = list(map(int, b))
-                top_left = (b[0], b[1])
-                bottom_right = (b[2], b[3])
+                coordinates.append((b[0], b[1], b[2], b[3])) # x1, y1, x2, y2
 
                 landmarks = [[b[2 * i - 1], b[2 * i]] for i in range(3, 8)]
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
                     (112, 112))
-                print("Alignment Time: {}".format(time.time()-start))
+                save_imgs.append(warped_face2)
+
+                # start = time.time()
+                model_input = preprocess(warped_face2)
+                batch.append(model_input)
+
+            if batch != []:
 
                 start = time.time()
-                model_input = preprocess(warped_face2)
-                embedding = arcface_r50_asian(model_input)
-                embedding = embedding.detach().numpy()
+                image_bbox = model_test.get_bbox(frame)
+                prediction = np.zeros((1, 3))
+                test_speed = 0
+                for model_name in os.listdir(model_dir):
+                    h_input, w_input, model_type, scale = parse_model_name(model_name)
+                    param = {
+                        "org_img": frame,
+                        "bbox": image_bbox,
+                        "scale": scale,
+                        "out_w": w_input,
+                        "out_h": h_input,
+                        "crop": True,
+                    }
+                    if scale is None:
+                        param["crop"] = False
+                    img = image_cropper.crop(**param)
+                    start = time.time()
+                    prediction += model_test.predict(img, os.path.join(model_dir, model_name))
+                    test_speed += time.time() - start
+                label = np.argmax(prediction)
+                print("Anti Spoofing Time: {:.4f}".format(time.time() - start))
+
+                batch = np.concatenate(batch, axis=0)
+                start = time.time()
+                embedding = arcface_r50_asian.run(None, {input_name: batch})
+
+                embedding = np.array(embedding)
+                embedding = np.squeeze(embedding, axis=0)
                 print("Embedding time: {}".format(time.time()-start))
 
-                cosins = cosine_similarity(embedding, X)
-                idx = np.argmax(cosins)
-                cosin = cosins[0, idx]
-                if cosin <= 0.35:
-                    name = "unknown"
-                else:
-                    label = int(y[idx])
-                    name = unidecode.unidecode(labels[label])
+                similarity = cosine_similarity(embedding, X)
+                # print(similarity.shape)
+                idx = np.argmax(similarity, axis=-1)
+                temp = range(0, len(similarity))
+                cosins = similarity[temp, idx]
+                # print(cosins.shape)
+                scores = cosins
 
-                cx = b[0]
-                cy = b[1] + 12
-                text = "{} {:.2f}".format(name, cosin)
+                for i in range(len(cosins)):
+                    if cosins[i] <= 0.4:
+                        name = "unknown"
+                    else:
+                        label = int(y[idx[i]])
+                        name = unidecode.unidecode(all_labels[label])
+                        print(datetime.fromtimestamp(time.time()),  ": " + name )
+
+                    labels.append(name)
+
+                # get max box
+                max_i = -1
+                max_area = 0
+                for i in range(len(labels)):
+                    area = (coordinates[i][2] - coordinates[i][0]) * (coordinates[i][3] - coordinates[i][1])
+                    if area > max_area:
+                        max_area = area
+                        max_i = i
+
+                # print largest face
+                cx = coordinates[max_i][0]
+                cy = coordinates[max_i][1] + 12
+                text = "{} {:.2f}".format(labels[max_i], scores[max_i])
                 # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
-                draw_border(frame, top_left, bottom_right, (0, 0, 255), 2, 7, 10)
-                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
+                if label == 1:
+                    draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
+                                (coordinates[max_i][2], coordinates[max_i][3]), (0, 128, 0), 2, 7, 10)
+                else:
+                    draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
+                                (coordinates[max_i][2], coordinates[max_i][3]), (0, 0, 255), 2, 7, 10)
+                cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
+                filename = labels[max_i] + " {:.2f} ".format(scores[max_i]) + str(time.time()) + ".jpg"
 
-            print("1 frames: {:.4f}".format(time.time()-start1))
+                if labels[max_i] != "unknown":
+                    cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[max_i], cv2.COLOR_RGB2BGR))
+
+                # print("1 frames: {:.4f}".format(time.time()-start1))
 
             cv2.imshow('frame', frame)
-            print("Total Faces: {}".format(num_face))
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -179,4 +249,4 @@ if __name__ == "__main__":
 
 
     camera.release()
-    cv2.destroyWindow("frame")
+    cv2.destroyAllWindows()

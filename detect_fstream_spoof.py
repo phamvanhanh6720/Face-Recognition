@@ -28,8 +28,9 @@ if __name__ == '__main__':
     box_detector = Detection()
     image_cropper = CropImage()
     count = 0
-    camera = cv2.VideoCapture(1)
-    # camera = cv2.VideoCapture('http://192.168.0.102:4747/video')
+    # camera = cv2.VideoCapture(1)
+    url_http = 'http://admin:dslabneu8@192.168.1.12:80/ISAPI/Streaming/channels/102/httppreview'
+    camera = cv2.VideoCapture(url_http)
 
     while True:
         ret, image = camera.read()

@@ -5,5 +5,8 @@ weights
 *.pyc
 .idea/
 *.zip
+*.cpython-38.pyc
+testCapture
+capture.py
 test.py
 /venv/

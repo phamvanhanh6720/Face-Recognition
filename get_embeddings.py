@@ -85,7 +85,7 @@ if __name__ == '__main__':
         embeddings = np.array(embeddings)
         print(embeddings.shape)
 
-        np.savez("./dataset/embeddings/" + str(label) + ".npz", embeddings, labels)
+        np.savez("./dataset/embeddings1/" + str(label) + ".npz", embeddings, labels)
 
     else:
         folders = os.listdir(args.aligned_dataset)

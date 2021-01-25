@@ -51,10 +51,14 @@ class Detection:
 
 
 class AntiSpoofPredict(Detection):
-    def __init__(self, device_id, model_path):
+    def __init__(self, model_path,cpu=True, device_id=0):
         super(AntiSpoofPredict, self).__init__()
-        self.device = torch.device("cuda:{}".format(device_id)
+
+        if not cpu:
+            self.device = torch.device("cuda:{}".format(device_id)
                                    if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device("cpu")
         # self.device = 'cpu'
         self._load_model(model_path)
         print(self.device)

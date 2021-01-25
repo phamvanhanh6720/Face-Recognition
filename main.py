@@ -13,11 +13,13 @@ from sklearn.metrics.pairwise import  cosine_similarity
 import time
 import unidecode
 import onnxruntime as ort
+from queue import Queue
 
 from datetime import datetime
 import warnings
 # Turn off warnming
 warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def preprocess(input_image, cpu=True):
@@ -55,6 +57,67 @@ def draw_border(img, pt1, pt2, color, thickness, r, d):
     cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness)
 
 
+def tracking(face_queue: Queue):
+    """
+    Args:
+        face_queue: Contain some elements: {label: str, spoof: int}
+        spoof: 0-fake 2d, 1-real, 2-fake 3d
+        special case: {label:"None", spoof: None} => Frame doesn't contain face
+    Returns:
+        True: push to web client
+        False: dont push
+    """
+
+    elements = list(face_queue.queue)
+    # print(elements)
+    # key: label, value: list contain 3 values: [num_existence in queue,num_real, num_fake]
+    unique_label = dict()
+    unique_label["None"] = [0, 0, 0]
+
+    for e in elements:
+        l = e['label']
+        spoof = e['spoof']
+
+        if l not in unique_label.keys():
+            unique_label[l] = [1, 1, 0] if spoof == 1 else [1, 0, 1]
+
+        elif l != "None":
+            num_real = unique_label[l][1]
+            num_fake = unique_label[l][2]
+            num_existence = unique_label[l][0]
+
+            if spoof == 1:
+                unique_label[l] = [num_existence+1, num_real+1, num_fake]
+            else:
+                unique_label[l] = [num_existence+1, num_real, num_fake+1]
+        else:
+            temp = unique_label["None"][0]
+            unique_label["None"] == [temp+1, 0, 0]
+
+    # print("uni", unique_label)
+    # Voting
+    max_existence = -1
+    name = "None"
+    for key in unique_label.keys():
+        if max_existence < unique_label[key][0]:
+            name = key
+            max_existence = unique_label[key][0]
+
+    # print(name)
+    if name != "None":
+        if [unique_label[key][0] for key in unique_label.keys()].count(max_existence) >= 2:
+            return 0, ""
+
+        # num_fake >= num_real
+        if unique_label[name][2] >= unique_label[name][1]:
+            return 0, "{}: fake {:.2f}".format(name, time.time())
+
+        return 1, "{}: real {:.2f}".format(name, time.time())
+
+    else:
+        return 0, ""
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
@@ -77,7 +140,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(e)
     print(args.label, all_labels)
-    files = glob.glob(args.embeddings_path + "/" +"*.npz")
+    files = glob.glob(args.embeddings_path + "/" + "*.npz")
 
     # embeddings vector of all people in dataset
     X = list()
@@ -88,16 +151,15 @@ if __name__ == "__main__":
         y.append(npzfile['arr_1'])
     X = np.concatenate(X, axis=0)
     y = np.concatenate(y, axis=0)
-    print(X.shape)
-    print(y.shape)
-    print(all_labels)
+    # print(X.shape)
+    # print(y.shape)
 
     faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
     image_cropper = CropImage()
     model_dir = './resources/anti_spoof_models'
     model_test = {}
     for model_name in os.listdir(model_dir):
-        model_test[model_name] = AntiSpoofPredict(0, os.path.join(model_dir, model_name))
+        model_test[model_name] = AntiSpoofPredict(os.path.join(model_dir, model_name))
     box_detector = Detection()
     label = 1
 
@@ -109,14 +171,17 @@ if __name__ == "__main__":
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 
-    # camera = cv2.VideoCapture(1)
+    camera = cv2.VideoCapture(1)
     # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.103:554/')
-    camera = cv2.VideoCapture('http://admin:dslabneu8@192.168.0.103:80/ISAPI/streaming/channels/102/httppreview')
+    # camera = cv2.VideoCapture('http://admin:dslabneu8@192.168.0.103:80/ISAPI/streaming/channels/102/httppreview')
     # camera.open(1, apiPreference=cv2.CAP_V4L2)
     camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
     camera.set(cv2.CAP_PROP_FPS, 30.0)
+
+    face_queue = Queue(maxsize=5)  # for tracking face
+    face_stack = []
     count = 0
 
     while True:
@@ -133,7 +198,7 @@ if __name__ == "__main__":
 
             start = time.time()
             dets = faceDetector.detect(frame)
-            print("Face detection Time: {:.4f}".format(time.time() - start))
+            # print("Face detection Time: {:.4f}".format(time.time() - start))
 
             batch = []  # contain all facial of an image
             coordinates = []
@@ -183,8 +248,8 @@ if __name__ == "__main__":
                     prediction += model.predict(img)
                     test_speed += time.time() - start
                 spoof = np.argmax(prediction)
-                print("Anti Spoofing Time: {:.4f}".format(time.time() - start))
-                print('spoof ', spoof)
+                # print("Anti Spoofing Time: {:.4f}".format(time.time() - start))
+                # print('spoof ', spoof)
 
                 batch = np.concatenate(batch, axis=0)
                 start = time.time()
@@ -192,7 +257,7 @@ if __name__ == "__main__":
 
                 embedding = np.array(embedding)
                 embedding = np.squeeze(embedding, axis=0)
-                print("Embedding time: {}".format(time.time()-start))
+                # print("Embedding time: {}".format(time.time()-start))
 
                 similarity = cosine_similarity(embedding, X)
                 # print(similarity.shape)
@@ -208,7 +273,7 @@ if __name__ == "__main__":
                     else:
                         label = int(y[idx[i]])
                         name = unidecode.unidecode(all_labels[label])
-                        print(datetime.fromtimestamp(time.time()),  ": " + name )
+                        # print(datetime.fromtimestamp(time.time()),  ": " + name )
 
                     labels.append(name)
 
@@ -221,34 +286,64 @@ if __name__ == "__main__":
                         max_area = area
                         max_i = i
 
-                # small face
-                if max_area < 10000:
-                    labels[max_i] = 'small'
-
-                print(max_area, label)
-
                 # print largest face
                 cx = coordinates[max_i][0]
                 cy = coordinates[max_i][1] + 12
                 text = "{} {:.2f}".format(labels[max_i], scores[max_i])
-                # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
+
                 if spoof == 1:
                     color = (255, 0, 0)
                 else:
-                    color = (0, 0, 255)
-                # draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
-                #                 (coordinates[max_i][2], coordinates[max_i][3]), (0, 0, 255), 2, 7, 10)
+                    color = (0, 0, 255)  # red
+
                 cv2.rectangle(
                     frame, (coordinates[max_i][0], coordinates[max_i][1]),
                     (coordinates[max_i][2], coordinates[max_i][3]), color, 2)
                 cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
                 filename = labels[max_i] + " {:.2f} ".format(scores[max_i]) + str(time.time()) + ".jpg"
 
-                # if labels[max_i] != "unknown":
-                #     cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[max_i], cv2.COLOR_RGB2BGR))
+                if labels[max_i] != "unknown":
+                    cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[max_i], cv2.COLOR_RGB2BGR))
+
+                face_queue.put({'label':labels[max_i], 'spoof': spoof})
 
                 # print("1 frames: {:.4f}".format(time.time()-start1))
-                # cv2.imwrite('./dataset/demo/{}_{}.jpg'.format(count, max_area), frame)
+
+            else:
+
+                face_queue.put({'label': "None", 'spoof':0})
+
+            signal, info = tracking(face_queue)
+            # print(face_queue.queue)
+
+            if signal == 0 and info == "":
+                print("Dont push to client")
+                if face_stack != []:
+                    face_stack.pop()
+
+            elif info.split(":")[0] == "unknown":
+                print("Dont push to client")
+                if face_stack != []:
+                    face_stack.pop()
+            else:
+
+                name = info.split(":")[0]
+                spoof = info.split(" ")[1]
+                res = {"label": name, "spoof": spoof}
+                if face_stack == []:
+                    face_stack.append(res)
+                    print("Push to web client: " + info)
+
+                elif face_stack[-1] == res:
+                    print("Dont push to client " + info)
+                else:
+                    face_stack.pop()
+                    face_stack.append(res)
+                    print("Push to web client: " + info)
+
+            if len(face_queue.queue) >= 4:
+                face_queue.get()
+
             cv2.imshow('frame', frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -259,4 +354,4 @@ if __name__ == "__main__":
             count = 0
 
     camera.release()
-    cv2.destroyWindow("frame")
+    cv2.destroyAllWindows()

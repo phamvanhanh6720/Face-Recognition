@@ -58,6 +58,7 @@ if __name__ == '__main__':
         ret, frame = camera.read()
         dets = faceDetector.detect(frame)
         original_img = np.copy(frame)
+
         if not ret:
             break
 

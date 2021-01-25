@@ -56,6 +56,7 @@ if __name__ == '__main__':
     landmarks = list()
     count = 0
     start = time.time()
+
     while True:
         ret, frame = camera.read()
         try:

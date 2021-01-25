@@ -1,8 +1,9 @@
 import cv2
 from utils.capture import VideoCaptureThreading
 import time
-
+import numpy as np
 if __name__=='__main__':
+
     url_http = 'http://admin:dslabneu8@192.168.0.103:80/ISAPI/streaming/channels/102/httppreview'
     cap = VideoCaptureThreading(url_http)
     cap.start()
@@ -22,3 +23,4 @@ if __name__=='__main__':
     print("total time: {:.2f}".format(time.time() - t0))
     cap.stop()
     cv2.destroyAllWindows()
+

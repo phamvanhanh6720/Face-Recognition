@@ -9,15 +9,14 @@ import glob
 if __name__=="__main__":
 
     parser = ArgumentParser(description="Process raw dataset")
-    parser.add_argument("--raw_dataset", "-raw_dataset", default="/home/phamvanhanh/PycharmProjects/FaceRecognition/dataset/Face", type=str)
+    parser.add_argument("--raw_dataset", "-raw_dataset", default="/home/phamvanhanh/PycharmProjects/FaceRecognition/dataset/temp_images", type=str)
     parser.add_argument("--cpu", '-cpu', default=True, type=bool)
-    parser.add_argument("--output_folder", "-output_folder", default="/home/phamvanhanh/PycharmProjects/FaceRecognition/dataset/images")
+    parser.add_argument("--output_folder", "-output_folder", default="/home/phamvanhanh/PycharmProjects/FaceRecognition/dataset/temp_face")
     parser.add_argument("-crop_size", "--crop_size", default=112, type=int)
 
     args = parser.parse_args()
 
-    faceDetector = FaceDetector(
-        trained_model="/home/phamvanhanh/PycharmProjects/FaceVerification/weights/mobilenet0.25_Final.pth")
+    faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_480.onnx")
 
     scale = args.crop_size / 112.
     reference = get_reference_facial_points(default_square=True) * scale

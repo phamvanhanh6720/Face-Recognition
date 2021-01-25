@@ -110,14 +110,14 @@ if __name__ == "__main__":
     input_name = arcface_r50_asian.get_inputs()[0].name
 
     camera = cv2.VideoCapture(1)
+    # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.103:554/')
+    # camera = cv2.VideoCapture('http://admin:dslabneu8@192.168.0.103:80/ISAPI/streaming/channels/102/httppreview')
     # camera.open(1, apiPreference=cv2.CAP_V4L2)
     camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
     camera.set(cv2.CAP_PROP_FPS, 30.0)
-
-    # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.200:554')
-    count =0
+    count = 0
 
     while True:
         ret, frame = camera.read()

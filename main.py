@@ -312,11 +312,15 @@ if __name__ == "__main__":
 
             if signal == 0 and info == "":
                 print("Dont push to client")
+                if face_stack != []:
+                    face_stack.pop()
 
             elif info.split(":")[0] == "unknown":
                 print("Dont push to client")
-
+                if face_stack != []:
+                    face_stack.pop()
             else:
+
                 name = info.split(":")[0]
                 spoof = info.split(" ")[1]
                 res = {"label": name, "spoof": spoof}

@@ -322,6 +322,8 @@ if __name__ == "__main__":
                 res = {"label": name, "spoof": spoof}
                 if face_stack == []:
                     face_stack.append(res)
+                    print("Push to web client: " + info)
+
                 elif face_stack[-1] == res:
                     print("Dont push to client " + info)
                 else:

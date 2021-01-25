@@ -109,9 +109,9 @@ if __name__ == "__main__":
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 
-    camera = cv2.VideoCapture(1)
+    # camera = cv2.VideoCapture(1)
     # camera = cv2.VideoCapture('rtsp://admin:dslabneu8@192.168.0.103:554/')
-    # camera = cv2.VideoCapture('http://admin:dslabneu8@192.168.0.103:80/ISAPI/streaming/channels/102/httppreview')
+    camera = cv2.VideoCapture('http://admin:dslabneu8@192.168.0.103:80/ISAPI/streaming/channels/102/httppreview')
     # camera.open(1, apiPreference=cv2.CAP_V4L2)
     camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        if count % 4 ==0:
+        if count % 6 ==0:
             # start1 = time.time()
             frame = cv2.resize(frame, (480, 640))
             original_img = np.copy(frame)
@@ -221,6 +221,12 @@ if __name__ == "__main__":
                         max_area = area
                         max_i = i
 
+                # small face
+                if max_area < 10000:
+                    labels[max_i] = 'small'
+
+                print(max_area, label)
+
                 # print largest face
                 cx = coordinates[max_i][0]
                 cy = coordinates[max_i][1] + 12
@@ -238,17 +244,17 @@ if __name__ == "__main__":
                 cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
                 filename = labels[max_i] + " {:.2f} ".format(scores[max_i]) + str(time.time()) + ".jpg"
 
-                if labels[max_i] != "unknown":
-                    cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[max_i], cv2.COLOR_RGB2BGR))
+                # if labels[max_i] != "unknown":
+                #     cv2.imwrite("./dataset/prediction" + "/" + filename, cv2.cvtColor(save_imgs[max_i], cv2.COLOR_RGB2BGR))
 
                 # print("1 frames: {:.4f}".format(time.time()-start1))
-
+                # cv2.imwrite('./dataset/demo/{}_{}.jpg'.format(count, max_area), frame)
             cv2.imshow('frame', frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        count +=1
+        count += 1
         if count > 10000:
             count = 0
 

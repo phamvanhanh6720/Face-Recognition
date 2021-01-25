@@ -5,3 +5,5 @@ weights
 *.pyc
 .idea/
 *.zip
+test.py
+venv

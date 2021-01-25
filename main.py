@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import glob
 from src.generate_patches import CropImage
 from src.utility import parse_model_name
-from src.anti_spoof_predict import AntiSpoofPredict
+from src.anti_spoof_predict import AntiSpoofPredict, Detection
 import numpy as np
 from FaceDetector import FaceDetector
 from sklearn.metrics.pairwise import  cosine_similarity
@@ -95,7 +95,10 @@ if __name__ == "__main__":
     faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
     image_cropper = CropImage()
     model_dir = './resources/anti_spoof_models'
-    model_test = AntiSpoofPredict(0)
+    model_test = {}
+    for model_name in os.listdir(model_dir):
+        model_test[model_name] = AntiSpoofPredict(0, os.path.join(model_dir, model_name))
+    box_detector = Detection()
     label = 1
 
     torch.set_grad_enabled(False)
@@ -125,12 +128,12 @@ if __name__ == "__main__":
         if count % 4 ==0:
             # start1 = time.time()
             frame = cv2.resize(frame, (480, 640))
+            original_img = np.copy(frame)
             # frame = cv2.resize(frame, (640, 480))
 
             start = time.time()
             dets = faceDetector.detect(frame)
             print("Face detection Time: {:.4f}".format(time.time() - start))
-            original_img = np.copy(frame)
 
             batch = []  # contain all facial of an image
             coordinates = []
@@ -160,13 +163,13 @@ if __name__ == "__main__":
             if batch != []:
 
                 start = time.time()
-                image_bbox = model_test.get_bbox(frame)
+                image_bbox = box_detector.get_bbox(original_img)
                 prediction = np.zeros((1, 3))
                 test_speed = 0
-                for model_name in os.listdir(model_dir):
+                for model_name, model in model_test.items():
                     h_input, w_input, model_type, scale = parse_model_name(model_name)
                     param = {
-                        "org_img": frame,
+                        "org_img": original_img,
                         "bbox": image_bbox,
                         "scale": scale,
                         "out_w": w_input,
@@ -177,10 +180,11 @@ if __name__ == "__main__":
                         param["crop"] = False
                     img = image_cropper.crop(**param)
                     start = time.time()
-                    prediction += model_test.predict(img, os.path.join(model_dir, model_name))
+                    prediction += model.predict(img)
                     test_speed += time.time() - start
-                label = np.argmax(prediction)
+                spoof = np.argmax(prediction)
                 print("Anti Spoofing Time: {:.4f}".format(time.time() - start))
+                print('spoof ', spoof)
 
                 batch = np.concatenate(batch, axis=0)
                 start = time.time()
@@ -222,12 +226,15 @@ if __name__ == "__main__":
                 cy = coordinates[max_i][1] + 12
                 text = "{} {:.2f}".format(labels[max_i], scores[max_i])
                 # cv2.rectangle(frame, top_left, bottom_right, (0, 0, 255), 2)
-                if label == 1:
-                    draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
-                                (coordinates[max_i][2], coordinates[max_i][3]), (0, 128, 0), 2, 7, 10)
+                if spoof == 1:
+                    color = (255, 0, 0)
                 else:
-                    draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
-                                (coordinates[max_i][2], coordinates[max_i][3]), (0, 0, 255), 2, 7, 10)
+                    color = (0, 0, 255)
+                # draw_border(frame, (coordinates[max_i][0], coordinates[max_i][1]),
+                #                 (coordinates[max_i][2], coordinates[max_i][3]), (0, 0, 255), 2, 7, 10)
+                cv2.rectangle(
+                    frame, (coordinates[max_i][0], coordinates[max_i][1]),
+                    (coordinates[max_i][2], coordinates[max_i][3]), color, 2)
                 cv2.putText(frame, text, (cx, cy), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0))
                 filename = labels[max_i] + " {:.2f} ".format(scores[max_i]) + str(time.time()) + ".jpg"
 
@@ -244,7 +251,6 @@ if __name__ == "__main__":
         count +=1
         if count > 10000:
             count = 0
-
 
     camera.release()
     cv2.destroyWindow("frame")

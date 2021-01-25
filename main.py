@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import  cosine_similarity
 import time
 import unidecode
 import onnxruntime as ort
+from utils.capture import VideoCaptureThreading
 
 from datetime import datetime
 import warnings
@@ -115,7 +116,10 @@ if __name__ == "__main__":
         camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
         camera.set(cv2.CAP_PROP_FPS, 30.0)"""
     url_http = 'http://admin:dslabneu8@192.168.1.12:80/ISAPI/Streaming/channels/102/httppreview'
-    camera = cv2.VideoCapture(url_http)
+    # camera = cv2.VideoCapture(url_http)
+    camera = VideoCaptureThreading(url_http)
+    camera.start()
+
     count =0
 
     while True:
@@ -124,7 +128,7 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        if count % 4 ==0:
+        if count % 15 ==0:
             # start1 = time.time()
             frame = cv2.resize(frame, (640, 480))
             # frame = cv2.resize(frame, (640, 480))
@@ -248,5 +252,6 @@ if __name__ == "__main__":
             count = 0
 
 
-    camera.release()
+    # camera.release()
+    camera.stop()
     cv2.destroyAllWindows()

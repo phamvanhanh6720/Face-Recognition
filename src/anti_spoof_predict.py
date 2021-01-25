@@ -51,7 +51,7 @@ class Detection:
 
 
 class AntiSpoofPredict(Detection):
-    def __init__(self,cpu=True, device_id=0):
+    def __init__(self, model_path,cpu=True, device_id=0):
         super(AntiSpoofPredict, self).__init__()
 
         if not cpu:
@@ -60,6 +60,7 @@ class AntiSpoofPredict(Detection):
         else:
             self.device = torch.device("cpu")
         # self.device = 'cpu'
+        self._load_model(model_path)
         print(self.device)
 
     def _load_model(self, model_path):
@@ -84,13 +85,12 @@ class AntiSpoofPredict(Detection):
             self.model.load_state_dict(state_dict)
         return None
 
-    def predict(self, img, model_path):
+    def predict(self, img):
         test_transform = trans.Compose([
             trans.ToTensor(),
         ])
         img = test_transform(img)
         img = img.unsqueeze(0).to(self.device)
-        self._load_model(model_path)
         self.model.eval()
         with torch.no_grad():
             result = self.model.forward(img)

@@ -5,7 +5,7 @@ import argparse
 import warnings
 import time
 
-from src.anti_spoof_predict import AntiSpoofPredict
+from src.anti_spoof_predict import AntiSpoofPredict, Detection
 from src.generate_patches import CropImage
 from src.utility import parse_model_name
 warnings.filterwarnings('ignore')
@@ -22,7 +22,10 @@ def check_image(image):
 if __name__ == '__main__':
     device_id = 0
     model_dir = './resources/anti_spoof_models'
-    model_test = AntiSpoofPredict(cpu=True, device_id=device_id)
+    model_test = {}
+    for model_name in os.listdir(model_dir):
+        model_test[model_name] = AntiSpoofPredict(0, os.path.join(model_dir, model_name))
+    box_detector = Detection()
     image_cropper = CropImage()
     count = 0
     # camera = cv2.VideoCapture(1)
@@ -31,13 +34,13 @@ if __name__ == '__main__':
 
     while True:
         ret, image = camera.read()
-
+        print(image.shape)
         image = cv2.resize(image, (image.shape[0], image.shape[1]))
         print(check_image(image))
-        image_bbox = model_test.get_bbox(image)
+        image_bbox = box_detector.get_bbox(image)
         prediction = np.zeros((1, 3))
         test_speed = 0
-        for model_name in os.listdir(model_dir):
+        for model_name, model in model_test.items():
             h_input, w_input, model_type, scale = parse_model_name(model_name)
             param = {
                 "org_img": image,
@@ -51,7 +54,7 @@ if __name__ == '__main__':
                 param["crop"] = False
             img = image_cropper.crop(**param)
             start = time.time()
-            prediction += model_test.predict(img, os.path.join(model_dir, model_name))
+            prediction += model.predict(img)
             test_speed += time.time() - start
         label = np.argmax(prediction)
         value = prediction[0][label] / 2

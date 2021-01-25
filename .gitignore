@@ -6,4 +6,4 @@ weights
 .idea/
 *.zip
 test.py
-venv
+/venv/

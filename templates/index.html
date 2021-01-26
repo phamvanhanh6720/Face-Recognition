@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Data Science Lab</title>
+    <link rel="stylesheet" href="static/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Bitter:400,700">
+    <link rel="stylesheet" href="static/fonts/font-awesome.min.css">
+    <link rel="stylesheet" href="static/css/Article-List.css">
+    <link rel="stylesheet" href="static/css/Header-Dark.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+</head>
+
+<body>
+    <div>
+        <div class="header-dark">
+            <nav class="navbar navbar-dark navbar-expand-lg navigation-clean-search">
+                <div class="container"><a class="navbar-brand" href="#">DS Lab</a><button data-toggle="collapse" class="navbar-toggler" data-target="#navcol-1"><span class="sr-only">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+                    <div class="collapse navbar-collapse"
+                        id="navcol-1">
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item" role="presentation"><a class="nav-link" href="#">About us</a></li>
+                        </ul>
+                        <form class="form-inline mr-auto" target="_self">
+                            <div class="form-group"><label for="search-field"><i class="fa fa-search"></i></label><input class="form-control search-field" type="search" id="search-field" name="search"></div>
+                        </form><span class="navbar-text"><a class="login" href="#">Log In</a></span><a class="btn btn-light action-button" role="button" href="#">Sign Up</a></div>
+                </div>
+            </nav>
+            <div class="container hero">
+                <div class="row" style="margin-top: 15%;">
+                    <div class="col-md-8 offset-md-2">
+                        <h1 class="text-center">Welcome To DS Lab</h1><img src="static/img/Untitled.png" style="display: block;margin-left: auto;margin-right: auto;"></div>
+                </div>
+            </div>
+            <article></article>
+        </div>
+    </div>
+    <div class="article-list">
+        <div class="container">
+            <div class="intro">
+                <h2 class="text-sm-center">FACE ATTENDANCE (REAL)</h2>
+                <p class="text-center">Date: {{ date }}</p>
+            </div>
+            <div class="row articles">
+                <div class="col text-center">
+                    <div class="table-responsive">
+                        <table class="table" id = "realtable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Time in</th>
+                                    <th>Photo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="article-list">
+        <div class="container">
+            <div class="intro">
+                <h2 class="text-sm-center">FACE ATTENDANCE (FAKE)</h2>
+                <p class="text-center">Date: {{ date }}</p>
+            </div>
+            <div class="row articles">
+                <div class="col text-center">
+                    <div class="table-responsive">
+                        <table class="table" id = "faketable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Time in</th>
+                                    <th>Photo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="static/js/jquery.min.js"></script>
+    <script src="static/bootstrap/js/bootstrap.min.js"></script>
+
+    <script>
+  $(function(){
+    window.setInterval(function(){
+    updatetable()
+    },500)
+
+  function updatetable(){
+        console.log('call update table')
+    $.ajax({
+        url:"/update_table",
+        type: "POST",
+        success: function(data){
+            console.log('xxxxxxxxxxxxxxxxxxxxxx')
+            console.log(data)
+        if (data.data[3] == 'Real')
+        {
+        $('#realtable > tbody').append(
+                    '<tr>' +
+                    '<td>' + data.data[0] + '</td>' +
+                    '<td>' + data.data[1] + '</td>' +
+                    '<td><img src="data:image/jpeg;base64,'+data.data[2]+'"height="120" width="120"></td>' +
+                    '</tr>');
+        }
+        else{
+        $('#faketable > tbody').append(
+                    '<tr>' +
+                    '<td>' + data.data[0] + '</td>' +
+                    '<td>' + data.data[1] + '</td>' +
+                    '<td><img src="data:image/jpeg;base64,'+data.data[2]+'"height="120" width="120"></td>' +
+                    '</tr>');
+        }
+        }
+    });
+   }
+   });
+    </script>
+</body>
+</html>

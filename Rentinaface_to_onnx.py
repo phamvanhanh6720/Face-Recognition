@@ -1,16 +1,8 @@
 from __future__ import print_function
-import os
 import argparse
 import torch
-import torch.backends.cudnn as cudnn
-import numpy as np
 from data import cfg_mnet, cfg_re50
-from layers.functions.prior_box import PriorBox
-from utils.nms.py_cpu_nms import py_cpu_nms
-import cv2
 from models.retinaface import RetinaFace
-from utils.box_utils import decode, decode_landm
-
 
 parser = argparse.ArgumentParser(description='Test')
 parser.add_argument('-m', '--trained_model', default='./weights/mobilenet0.25_Final.pth',

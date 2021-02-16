@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import os
 import numpy as np
 import time
-from align.align_trans import warp_and_crop_face, get_reference_facial_points
+from utils.align import warp_and_crop_face, get_reference_facial_points
 import glob
 
 def crop_image(original_image, top_left, bottom_right):

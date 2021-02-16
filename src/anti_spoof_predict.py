@@ -43,9 +43,11 @@ class Detection:
         blob = cv2.dnn.blobFromImage(img, 1, mean=(104, 117, 123))
         self.detector.setInput(blob, 'data')
         out = self.detector.forward('detection_out').squeeze()
+
         max_conf_index = np.argmax(out[:, 2])
         left, top, right, bottom = out[max_conf_index, 3]*width, out[max_conf_index, 4]*height, \
                                    out[max_conf_index, 5]*width, out[max_conf_index, 6]*height
+
         bbox = [int(left), int(top), int(right-left+1), int(bottom-top+1)]
         return bbox
 
@@ -59,9 +61,8 @@ class AntiSpoofPredict(Detection):
                                    if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device("cpu")
-        # self.device = 'cpu'
+
         self._load_model(model_path)
-        print(self.device)
 
     def _load_model(self, model_path):
         # define model
@@ -72,6 +73,7 @@ class AntiSpoofPredict(Detection):
 
         # load model weight
         state_dict = torch.load(model_path, map_location=self.device)
+
         keys = iter(state_dict)
         first_layer_name = keys.__next__()
         if first_layer_name.find('module.') >= 0:

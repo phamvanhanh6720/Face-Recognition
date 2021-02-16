@@ -1,59 +1,17 @@
-from __future__ import print_function
-import os
-import argparse
 import torch
 import numpy as np
 from data import cfg_mnet, cfg_re50
-from layers.functions.prior_box import PriorBox
+from utils.box.prior_box import PriorBox
 from utils.nms.py_cpu_nms import py_cpu_nms
-from models.retinaface import RetinaFace
-from utils.box_utils import decode, decode_landm
+from utils.box.box_utils import decode, decode_landm
 import time
 import onnxruntime as ort
-
-def check_keys(model, pretrained_state_dict):
-    ckpt_keys = set(pretrained_state_dict.keys())
-    model_keys = set(model.state_dict().keys())
-    used_pretrained_keys = model_keys & ckpt_keys
-    unused_pretrained_keys = ckpt_keys - model_keys
-    missing_keys = model_keys - ckpt_keys
-    # print('Missing keys:{}'.format(len(missing_keys)))
-    # print('Unused checkpoint keys:{}'.format(len(unused_pretrained_keys)))
-    # print('Used keys:{}'.format(len(used_pretrained_keys)))
-    assert len(used_pretrained_keys) > 0, 'load NONE from pretrained checkpoint'
-    return True
-
-
-def remove_prefix(state_dict, prefix):
-    """
-    Old style model is stored with all names of parameters sharing common prefix 'module.
-    """
-    print('remove prefix \'{}\''.format(prefix))
-    f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
-    return {f(key): value for key, value in state_dict.items()}
-
-
-def load_model(model, pretrained_path, load_to_cpu):
-    print('Loading pretrained model from {}'.format(pretrained_path))
-    if load_to_cpu:
-        pretrained_dict = torch.load(pretrained_path, map_location=lambda storage, loc: storage)
-    else:
-        device = torch.cuda.current_device()
-        pretrained_dict = torch.load(pretrained_path, map_location=lambda storage, loc: storage.cuda(device))
-    if "state_dict" in pretrained_dict.keys():
-        pretrained_dict = remove_prefix(pretrained_dict['state_dict'], 'module.')
-    else:
-        pretrained_dict = remove_prefix(pretrained_dict, 'module.')
-    check_keys(model, pretrained_dict)
-    model.load_state_dict(pretrained_dict, strict=False)
-    return model
 
 
 class FaceDetector:
     def __init__(self, network='mobile0.25', cpu=True, onnx_path="./weights/FaceDetector_640.onnx",
                  confidence_threshold=0.02, top_k=5000, nms_threshold=0.4, keep_top_k=750, vis_thres=0.6):
 
-        self.network = network
         self.network = network
         self.cpu = cpu
         self.confidence_threshold = confidence_threshold
@@ -76,22 +34,13 @@ class FaceDetector:
 
         self.device = torch.device("cpu" if self.cpu else "cuda")
 
-        """        
-        torch.set_grad_enabled(False)
-        # build net and load model
-        self.net = RetinaFace(self.cfg, phase='test')
-        self.net = load_model(self.net, self.trained_model, self.cpu)
-        self.net = self.net.eval()
-        self.net = self.net.to(self.device)
-        """
-
     def detect(self, image_raw):
         """
         Detect face from single image
         :param image_raw: ndarray of image
         :return:
         """
-
+        # preprocess input image
         img = np.float32(image_raw)
         try:
             im_height, im_width, _ = img.shape
@@ -102,9 +51,9 @@ class FaceDetector:
         img = img.transpose(2, 0, 1)
         img = np.expand_dims(img, axis=0)
 
-        tic = time.time()
-        loc, conf, landms = self.ort_session.run(None, {self.input_name: img})  # forward pass
-        # print('net forward time: {:.4f}'.format(time.time() - tic))
+        # forward pass
+        loc, conf, landms = self.ort_session.run(None, {self.input_name: img})
+
         # convert ndarray to tensor pytorch
         loc = torch.from_numpy(loc)
         loc = loc.to(self.device)
@@ -123,8 +72,8 @@ class FaceDetector:
         scores = np.squeeze(conf, axis=0)[:, 1]
         landms = decode_landm(landms.data.squeeze(0), prior_data, self.cfg['variance'])
         scale1 = torch.Tensor([img.shape[3], img.shape[2], img.shape[3], img.shape[2],
-                                   img.shape[3], img.shape[2], img.shape[3], img.shape[2],
-                                   img.shape[3], img.shape[2]])
+                               img.shape[3], img.shape[2], img.shape[3], img.shape[2],
+                               img.shape[3], img.shape[2]])
         scale1 = scale1.to(self.device)
         landms = landms * scale1 / self.resize
         landms = landms.cpu().numpy()
@@ -155,5 +104,3 @@ class FaceDetector:
         dets = np.concatenate((dets, landms), axis=1)
 
         return dets
-
-

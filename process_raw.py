@@ -3,7 +3,7 @@ import os
 from argparse import ArgumentParser
 import numpy as np
 from FaceDetector import FaceDetector
-from align.align_trans import warp_and_crop_face, get_reference_facial_points
+from utils.align import warp_and_crop_face, get_reference_facial_points
 import glob
 
 if __name__=="__main__":

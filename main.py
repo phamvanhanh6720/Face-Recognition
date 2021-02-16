@@ -154,7 +154,7 @@ if __name__ == "__main__":
     # print(X.shape)
     # print(y.shape)
 
-    faceDetector = FaceDetector(onnx_path="./weights/FaceDetector_640.onnx")
+    faceDetector = FaceDetector(onnx_path="./weights/detection_model/FaceDetector_640.onnx")
     image_cropper = CropImage()
     model_dir = './resources/anti_spoof_models'
     model_test = {}
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
-    arcface_onnx_path = os.path.join("./weights/ArcFace_R50.onnx")
+    arcface_onnx_path = os.path.join("./weights/embedding_model/ArcFace_R50.onnx")
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 

@@ -9,3 +9,4 @@ weights
 testCapture
 capture.py
 test.py
+**/*.pyc

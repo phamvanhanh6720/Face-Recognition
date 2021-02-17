@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-if __name__ == "__main__":
+def main():
     parser = ArgumentParser()
     parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
     parser.add_argument("-label", "--label", default="./dataset/label.txt", type=str)
@@ -164,3 +164,7 @@ if __name__ == "__main__":
 
     camera.release()
     cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    main()

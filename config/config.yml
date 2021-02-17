@@ -1,0 +1,10 @@
+
+weights:
+    face_detections:
+        FaceDetector_480_onnx: https://drive.google.com/uc?id=1x7eeCvGesAHpEujRDJeQoBATqRHaiN6p&export=download
+        FaceDetector_640_onnx: https://drive.google.com/uc?id=1JmiqwvLibzAVO863_FpUNhefkD2r_hiU&export=download
+    embedding_models:
+        ArcFace_R50_onnx: https://drive.google.com/uc?id=117NH1r0bJQs3q88KKNU3X7-6RTtLQHCe&export=download
+    anti_spoof_models:
+        MiniFASNETV2_pytorch: https://drive.google.com/uc?id=1hWihYFCbK1zutOk-ZhZVsbvjGGomGti1&export=download
+        MiniFASNETV1SE_pytorch: https://drive.google.com/uc?id=1LQRhqSNAKiNSLtYb_KClT2TGJg06vrsA&export=download

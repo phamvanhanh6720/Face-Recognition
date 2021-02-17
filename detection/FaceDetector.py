@@ -1,11 +1,11 @@
 import torch
 import numpy as np
-from data import cfg_mnet, cfg_re50
-from utils.box.prior_box import PriorBox
-from utils.nms.py_cpu_nms import py_cpu_nms
-from utils.box.box_utils import decode, decode_landm
-import time
 import onnxruntime as ort
+
+from detection.config import cfg_mnet, cfg_re50
+from detection.box.prior_box import PriorBox
+from detection.nms.py_cpu_nms import py_cpu_nms
+from detection.box.box_utils import decode, decode_landm
 
 
 class FaceDetector:

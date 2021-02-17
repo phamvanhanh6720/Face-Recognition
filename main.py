@@ -1,113 +1,25 @@
 import os
-import time
 import glob
+import warnings
 from queue import Queue
 from argparse import ArgumentParser
-# Turn off warnming
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
-import cv2
 import torch
-import numpy as np
 import unidecode
 import onnxruntime as ort
+from sklearn.metrics.pairwise import cosine_similarity
 
-from utils.align import warp_and_crop_face, get_reference_facial_points
 from utils.process import *
-from utils.box import find_max_bbox
-from src.generate_patches import CropImage
-from src.utility import parse_model_name
-from src.anti_spoof_predict import AntiSpoofPredict, Detection
-from FaceDetector import FaceDetector
-from sklearn.metrics.pairwise import  cosine_similarity
+from utils import tracking
+from utils import find_max_bbox
+from detection import FaceDetector
+from align import warp_and_crop_face, get_reference_facial_points
+from anti_spoofing.detect_spoof import detect_spoof
+from anti_spoofing.anti_spoof_predict import AntiSpoofPredict
 
-
-def tracking(face_queue: Queue):
-    """
-    Args:
-        face_queue: Contain some elements: {label: str, spoof: int}
-        spoof: 0-fake 2d, 1-real, 2-fake 3d
-        special case: {label:"None", spoof: None} => Frame doesn't contain face
-    Returns:
-        True: push to web client
-        False: dont push
-    """
-
-    elements = list(face_queue.queue)
-    # print(elements)
-    # key: label, value: list contain 3 values: [num_existence in queue,num_real, num_fake]
-    unique_label = dict()
-    unique_label["None"] = [0, 0, 0]
-
-    for e in elements:
-        l = e['label']
-        spoof = e['spoof']
-
-        if l not in unique_label.keys():
-            unique_label[l] = [1, 1, 0] if spoof == 1 else [1, 0, 1]
-
-        elif l != "None":
-            num_real = unique_label[l][1]
-            num_fake = unique_label[l][2]
-            num_existence = unique_label[l][0]
-
-            if spoof == 1:
-                unique_label[l] = [num_existence+1, num_real+1, num_fake]
-            else:
-                unique_label[l] = [num_existence+1, num_real, num_fake+1]
-        else:
-            temp = unique_label["None"][0]
-            unique_label["None"] == [temp+1, 0, 0]
-
-    # print("uni", unique_label)
-    # Voting
-    max_existence = -1
-    name = "None"
-    for key in unique_label.keys():
-        if max_existence < unique_label[key][0]:
-            name = key
-            max_existence = unique_label[key][0]
-
-    # print(name)
-    if name != "None":
-        if [unique_label[key][0] for key in unique_label.keys()].count(max_existence) >= 2:
-            return 0, ""
-
-        # num_fake >= num_real
-        if unique_label[name][2] >= unique_label[name][1]:
-            return 0, "{}: fake {:.2f}".format(name, time.time())
-
-        return 1, "{}: real {:.2f}".format(name, time.time())
-
-    else:
-        return 0, ""
-
-
-def detect_spoof(all_models, image_bbox, original_img):
-
-    prediction = np.zeros((1, 3))
-    test_speed = 0
-    for model_name, model in model_test.items():
-        h_input, w_input, model_type, scale = parse_model_name(model_name)
-        param = {
-            "org_img": original_img,
-            "bbox": image_bbox,
-            "scale": scale,
-            "out_w": w_input,
-            "out_h": h_input,
-            "crop": True,
-        }
-        if scale is None:
-            param["crop"] = False
-        img = image_cropper.crop(**param)
-        start = time.time()
-        prediction += model.predict(img)
-        test_speed += time.time() - start
-
-    idx_spoof = np.argmax(prediction)
-    return idx_spoof
+# Turn off warnming
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 if __name__ == "__main__":
@@ -147,28 +59,26 @@ if __name__ == "__main__":
     # print(y.shape)
 
     faceDetector = FaceDetector(onnx_path="./weights/detection_model/FaceDetector_640.onnx")
-    image_cropper = CropImage()
     model_dir = './weights/anti_spoof_models'
     model_test = {}
     for model_name in os.listdir(model_dir):
         model_test[model_name] = AntiSpoofPredict(os.path.join(model_dir, model_name))
-    box_detector = Detection()
     label = 1
 
     torch.set_grad_enabled(False)
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
-    arcface_onnx_path = os.path.join("./weights/embedding_model/ArcFace_R50.onnx")
+    arcface_onnx_path = os.path.join("weights/embedding_model/ArcFace_R50.onnx")
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 
-    face_queue = Queue(maxsize=5) # for tracking face
+    face_queue = Queue(maxsize=7) # for tracking face
     face_stack = []
 
     # camera = cv2.VideoCapture(url_http)
     camera = cv2.VideoCapture(0)
-    count =0
+    count = 0
 
     while True:
         ret, frame = camera.read()
@@ -181,20 +91,20 @@ if __name__ == "__main__":
             original_img = np.copy(frame)
             dets = faceDetector.detect(frame)
 
-            remove_rows = list(np.where(dets[:, 4] < 0.6)[0]) #score_thresold
+            remove_rows = list(np.where(dets[:, 4] < 0.6)[0]) # score_thresold
             dets = np.delete(dets, remove_rows, axis=0)
 
             if dets.shape[0] != 0:
                 max_bbox = find_max_bbox(dets)
-
                 coordinate = [max_bbox[0], max_bbox[1], max_bbox[2], max_bbox[3]]   # x1, y1, x2, y2
                 landmarks = [[max_bbox[2 * i - 1], max_bbox[2 * i]] for i in range(3, 8)]
 
-
+                # Face Anti Spoofing
                 # image_bbox: x_top_left, y_top_left, width, height
                 image_bbox = [int(max_bbox[0]), int(max_bbox[1]), int(max_bbox[2]-max_bbox[0]), int(max_bbox[3]-max_bbox[1])]
                 spoof = detect_spoof(model_test, image_bbox, original_img)
 
+                # Get extract_feature
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
                     (112, 112))
@@ -203,6 +113,7 @@ if __name__ == "__main__":
                 embedding = np.array(embedding)
                 embedding = np.squeeze(embedding, axis=0)
 
+                # Calculate similarity
                 similarity = cosine_similarity(embedding, X)
                 idx = np.argmax(similarity, axis=-1)
                 cosin = float(similarity[0, idx])
@@ -215,39 +126,33 @@ if __name__ == "__main__":
 
                 draw_box(frame, coordinate, cosin, name, spoof)
 
-                face_queue.put({'label':label, 'spoof': spoof})
-
+                face_queue.put({'label':name, 'spoof': spoof})
             else:
-                face_queue.put({'label': "None", 'spoof':0})
+                face_queue.put({'label': "None", 'spoof': 0})
 
-            signal, info = tracking(face_queue)
+            result_tracking = tracking(face_queue)
 
-            if signal == 0 and info == "":
+            if not result_tracking[0]:
                 print("Dont push to client")
                 if face_stack != []:
                     face_stack.pop()
 
-            elif info.split(":")[0] == "unknown":
-                print("Dont push to client")
-                if face_stack != []:
-                    face_stack.pop()
             else:
-
-                name = info.split(":")[0]
-                spoof = info.split(" ")[1]
-                res = {"label": name, "spoof": spoof}
-                if face_stack == []:
+                name = result_tracking[2]
+                spoof = result_tracking[1]
+                res = [name, spoof]
+                if  face_stack == []:
                     face_stack.append(res)
-                    print("Push to web client: " + info)
+                    print("Push to web client:{} {}".format(name, spoof))
 
                 elif face_stack[-1] == res:
-                    print("Dont push to client " + info)
+                    print("Dont push to web client:{} {}".format(name, spoof))
                 else:
                     face_stack.pop()
                     face_stack.append(res)
-                    print("Push to web client: " + info)
+                    print("Push to web client:{} {}".format(name, spoof))
 
-            if len(face_queue.queue) >= 4:
+            if len(face_queue.queue) >= 7:
                 face_queue.get()
 
             cv2.imshow('frame', frame)

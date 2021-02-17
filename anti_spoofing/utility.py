@@ -1,16 +1,45 @@
 # -*- coding: utf-8 -*-
-# @Time : 20-6-9 下午3:06
+# @Time : 20-6-4 下午2:13
 # @Author : zhuying
 # @Company : Minivision
-# @File : test.py
+# @File : utility.py
 # @Software : PyCharm
-"""
-Create patch from original input image by using bbox coordinate
-"""
 
+from datetime import datetime
+import os
 import cv2
 import numpy as np
 
+def get_time():
+    return (str(datetime.now())[:-10]).replace(' ', '-').replace(':', '-')
+
+
+def get_kernel(height, width):
+    kernel_size = ((height + 15) // 16, (width + 15) // 16)
+    return kernel_size
+
+
+def get_width_height(patch_info):
+    w_input = int(patch_info.split('x')[-1])
+    h_input = int(patch_info.split('x')[0].split('_')[-1])
+    return w_input,h_input
+
+
+def parse_model_name(model_name):
+    info = model_name.split('_')[0:-1]
+    h_input, w_input = info[-1].split('x')
+    model_type = model_name.split('.pth')[0].split('_')[-1]
+
+    if info[0] == "org":
+        scale = None
+    else:
+        scale = float(info[0])
+    return int(h_input), int(w_input), model_type, scale
+
+
+def make_if_not_exist(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
 
 class CropImage:
     @staticmethod
@@ -50,14 +79,15 @@ class CropImage:
         return int(left_top_x), int(left_top_y),\
                int(right_bottom_x), int(right_bottom_y)
 
-    def crop(self, org_img, bbox, scale, out_w, out_h, crop=True):
+    @staticmethod
+    def crop(org_img, bbox, scale, out_w, out_h, crop=True):
 
         if not crop:
             dst_img = cv2.resize(org_img, (out_w, out_h))
         else:
             src_h, src_w, _ = np.shape(org_img)
             left_top_x, left_top_y, \
-                right_bottom_x, right_bottom_y = self._get_new_box(src_w, src_h, bbox, scale)
+                right_bottom_x, right_bottom_y = CropImage._get_new_box(src_w, src_h, bbox, scale)
 
             img = org_img[left_top_y: right_bottom_y+1,
                           left_top_x: right_bottom_x+1]

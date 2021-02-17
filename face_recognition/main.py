@@ -2,6 +2,7 @@ import os
 import glob
 import warnings
 from queue import Queue
+from typing import List
 from argparse import ArgumentParser
 
 import torch
@@ -10,7 +11,7 @@ import onnxruntime as ort
 from sklearn.metrics.pairwise import cosine_similarity
 
 from face_recognition.utils.process import *
-from face_recognition.utils import tracking, find_max_bbox
+from face_recognition.utils import tracking, find_max_bbox, Cfg, download_weights
 from face_recognition.detection import FaceDetector
 from face_recognition.align import warp_and_crop_face, get_reference_facial_points
 from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
@@ -25,7 +26,6 @@ def main():
     parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
     parser.add_argument("-label", "--label", default="./dataset/label.txt", type=str)
     parser.add_argument("-cpu", "--cpu", default=True, type=str)
-    parser.add_argument("-weight_path", "--weight_path", default="./weights/backbone_ir50_asia.pth", type=str)
 
     args = parser.parse_args()
     reference = get_reference_facial_points(default_square=True)
@@ -53,28 +53,29 @@ def main():
         y.append(npzfile['arr_1'])
     X = np.concatenate(X, axis=0)
     y = np.concatenate(y, axis=0)
-    # print(X.shape)
-    # print(y.shape)
 
-    faceDetector = FaceDetector(onnx_path="/home/phamvanhanh/PycharmProjects/FaceRecognition/weights/detection_model/FaceDetector_640.onnx")
-    model_dir = '/home/phamvanhanh/PycharmProjects/FaceRecognition/weights/anti_spoof_models'
-    model_test = {}
-    for model_name in os.listdir(model_dir):
-        model_test[model_name] = AntiSpoofPredict(os.path.join(model_dir, model_name))
-    label = 1
+    config: dict = Cfg.load_config()
 
-    torch.set_grad_enabled(False)
-    device = torch.device('cpu' if args.cpu else 'cuda:0')
+    # Load Face Detection Model
+    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_640_onnx'])
+    face_detector = FaceDetector(onnx_path=detection_model_path)
 
-    # Feature Extraction Model
-    arcface_onnx_path = os.path.join("/home/phamvanhanh/PycharmProjects/FaceRecognition/weights/embedding_model/ArcFace_R50.onnx")
+    # Load Face Anti Spoof Models
+    anti_spoof_names: List[str] = config['anti_spoof_name']
+    model_spoofing = {}
+    for model_name in anti_spoof_names:
+        path = download_weights(config['weights']['anti_spoof_models'][model_name])
+        model_spoofing[model_name] = AntiSpoofPredict(model_path=path, model_name=model_name)
+
+    # Load Embedding Model
+    arcface_onnx_path = download_weights(config['weights']['embedding_models']['ArcFace_R50_onnx'])
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 
-    face_queue = Queue(maxsize=7) # for tracking face
-    face_stack = []
+    # Queue for tracking face
+    faces_queue = Queue(maxsize=7)
+    faces_stack = []
 
-    # camera = cv2.VideoCapture(url_http)
     camera = cv2.VideoCapture(0)
     count = 0
 
@@ -87,7 +88,7 @@ def main():
         if count % 6 == 0:
 
             original_img = np.copy(frame)
-            dets = faceDetector.detect(frame)
+            dets = face_detector.detect(frame)
 
             remove_rows = list(np.where(dets[:, 4] < 0.6)[0]) # score_thresold
             dets = np.delete(dets, remove_rows, axis=0)
@@ -100,7 +101,7 @@ def main():
                 # Face Anti Spoofing
                 # image_bbox: x_top_left, y_top_left, width, height
                 image_bbox = [int(max_bbox[0]), int(max_bbox[1]), int(max_bbox[2]-max_bbox[0]), int(max_bbox[3]-max_bbox[1])]
-                spoof = detect_spoof(model_test, image_bbox, original_img)
+                spoof = detect_spoof(model_spoofing, image_bbox, original_img)
 
                 # Get extract_feature
                 warped_face2 = warp_and_crop_face(
@@ -124,34 +125,34 @@ def main():
 
                 draw_box(frame, coordinate, cosin, name, spoof)
 
-                face_queue.put({'label':name, 'spoof': spoof})
+                faces_queue.put({'label':name, 'spoof': spoof})
             else:
-                face_queue.put({'label': "None", 'spoof': 0})
+                faces_queue.put({'label': "None", 'spoof': 0})
 
-            result_tracking = tracking(face_queue)
+            result_tracking = tracking(faces_queue)
 
             if not result_tracking[0]:
                 print("Dont push to client")
-                if face_stack != []:
-                    face_stack.pop()
+                if faces_stack != []:
+                    faces_stack.pop()
 
             else:
                 name = result_tracking[2]
                 spoof = result_tracking[1]
                 res = [name, spoof]
-                if  face_stack == []:
-                    face_stack.append(res)
+                if  faces_stack == []:
+                    faces_stack.append(res)
                     print("Push to web client:{} {}".format(name, spoof))
 
-                elif face_stack[-1] == res:
+                elif faces_stack[-1] == res:
                     print("Dont push to web client:{} {}".format(name, spoof))
                 else:
-                    face_stack.pop()
-                    face_stack.append(res)
+                    faces_stack.pop()
+                    faces_stack.append(res)
                     print("Push to web client:{} {}".format(name, spoof))
 
-            if len(face_queue.queue) >= 7:
-                face_queue.get()
+            if len(faces_queue.queue) >= 7:
+                faces_queue.get()
 
             cv2.imshow('frame', frame)
 

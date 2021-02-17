@@ -22,7 +22,7 @@ MODEL_MAPPING = {
 }
 
 class AntiSpoofPredict():
-    def __init__(self, model_path,cpu=True, device_id=0):
+    def __init__(self, model_path, model_name:str, cpu=True, device_id=0):
 
         if not cpu:
             self.device = torch.device("cuda:{}".format(device_id)
@@ -30,11 +30,13 @@ class AntiSpoofPredict():
         else:
             self.device = torch.device("cpu")
 
+        self.model_name = model_name
         self._load_model(model_path)
+
 
     def _load_model(self, model_path):
         # define model
-        model_name = os.path.basename(model_path)
+        model_name = self.model_name
         h_input, w_input, model_type, _ = parse_model_name(model_name)
         self.kernel_size = get_kernel(h_input, w_input,)
         self.model = MODEL_MAPPING[model_type](conv6_kernel=self.kernel_size).to(self.device)

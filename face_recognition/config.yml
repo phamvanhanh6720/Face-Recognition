@@ -1,5 +1,6 @@
 anti_spoof_name: ['2.7_80x80_MiniFASNetV2', '4_0_0_80x80_MiniFASNetV1SE']
 
+camera_url:
 
 weights:
     face_detections:

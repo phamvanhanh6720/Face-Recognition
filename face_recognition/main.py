@@ -2,7 +2,7 @@ import os
 import glob
 import warnings
 from queue import Queue
-from typing import List
+from typing import List, Optional, Tuple
 from argparse import ArgumentParser
 
 import torch
@@ -11,7 +11,8 @@ import onnxruntime as ort
 from sklearn.metrics.pairwise import cosine_similarity
 
 from face_recognition.utils.process import *
-from face_recognition.utils import tracking, find_max_bbox, Cfg, download_weights
+from face_recognition.utils import find_max_bbox, Cfg, download_weights
+from face_recognition.utils import track_queue, check_change
 from face_recognition.detection import FaceDetector
 from face_recognition.align import warp_and_crop_face, get_reference_facial_points
 from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
@@ -21,7 +22,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def main():
+def main(device=0):
     parser = ArgumentParser()
     parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
     parser.add_argument("-label", "--label", default="./dataset/label.txt", type=str)
@@ -74,9 +75,11 @@ def main():
 
     # Queue for tracking face
     faces_queue = Queue(maxsize=7)
-    faces_stack = []
+    current_state: Optional[tuple] = None
 
-    camera = cv2.VideoCapture(0)
+    # Camera Configure
+    camera_url = config['camera_url'] if device is None else None
+    camera = cv2.VideoCapture(device) if camera_url is None else cv2.VideoCapture(camera_url)
     count = 0
 
     while True:
@@ -88,13 +91,14 @@ def main():
         if count % 6 == 0:
 
             original_img = np.copy(frame)
-            dets = face_detector.detect(frame)
+            bounding_boxes = face_detector.detect(frame)
 
-            remove_rows = list(np.where(dets[:, 4] < 0.6)[0]) # score_thresold
-            dets = np.delete(dets, remove_rows, axis=0)
+            remove_rows = list(np.where(bounding_boxes[:, 4] < 0.6)[0]) # score_thresold
+            bounding_boxes = np.delete(bounding_boxes, remove_rows, axis=0)
 
-            if dets.shape[0] != 0:
-                max_bbox = find_max_bbox(dets)
+            if bounding_boxes.shape[0] != 0 and find_max_bbox(bounding_boxes) is not None:
+                max_bbox = find_max_bbox(bounding_boxes)
+
                 coordinate = [max_bbox[0], max_bbox[1], max_bbox[2], max_bbox[3]]   # x1, y1, x2, y2
                 landmarks = [[max_bbox[2 * i - 1], max_bbox[2 * i]] for i in range(3, 8)]
 
@@ -129,27 +133,8 @@ def main():
             else:
                 faces_queue.put({'label': "None", 'spoof': 0})
 
-            result_tracking = tracking(faces_queue)
-
-            if not result_tracking[0]:
-                print("Dont push to client")
-                if faces_stack != []:
-                    faces_stack.pop()
-
-            else:
-                name = result_tracking[2]
-                spoof = result_tracking[1]
-                res = [name, spoof]
-                if  faces_stack == []:
-                    faces_stack.append(res)
-                    print("Push to web client:{} {}".format(name, spoof))
-
-                elif faces_stack[-1] == res:
-                    print("Dont push to web client:{} {}".format(name, spoof))
-                else:
-                    faces_stack.pop()
-                    faces_stack.append(res)
-                    print("Push to web client:{} {}".format(name, spoof))
+            result_tracking = track_queue(faces_queue)
+            current_state = check_change(result_tracking, current_state)
 
             if len(faces_queue.queue) >= 7:
                 faces_queue.get()

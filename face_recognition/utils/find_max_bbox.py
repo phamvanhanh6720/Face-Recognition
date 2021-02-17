@@ -1,9 +1,11 @@
 import numpy as np
+from typing import Optional, List
 
 
-def find_max_bbox(dets, area_threshold=None):
+def find_max_bbox(dets, area_threshold=None) -> Optional[List[int]]:
     """
-    Calculate area of all bounding boxes and return maximum bounding box
+    Calculate area of all bounding boxes and return maximum bounding box if maximum bounding box >= area_threshold
+
     Args:
         dets: 2D array contain all bounding boxes, Shape: (n, 15) - (x1, y1, x2, y2, score, 5 landmarks)
         area_threshold:
@@ -18,7 +20,7 @@ def find_max_bbox(dets, area_threshold=None):
     ares = (x2 - x1) * (y2 - y1)
     max_idx = np.argmax(ares, axis=0)[0]
     max_are = ares[max_idx][0]
-    if area_threshold != None:
+    if area_threshold is not None:
         if max_are < area_threshold:
             return None
 

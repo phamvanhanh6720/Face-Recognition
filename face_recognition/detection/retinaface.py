@@ -3,9 +3,9 @@ import torch.nn as nn
 import torchvision.models._utils as _utils
 import torch.nn.functional as F
 
-from detection.net import MobileNetV1 as MobileNetV1
-from detection.net import FPN as FPN
-from detection.net import SSH as SSH
+from face_recognition.detection.net import MobileNetV1 as MobileNetV1
+from face_recognition.detection.net import FPN as FPN
+from face_recognition.detection.net import SSH as SSH
 
 
 class ClassHead(nn.Module):

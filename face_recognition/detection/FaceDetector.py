@@ -2,10 +2,10 @@ import torch
 import numpy as np
 import onnxruntime as ort
 
-from detection.config import cfg_mnet, cfg_re50
-from detection.box.prior_box import PriorBox
-from detection.nms.py_cpu_nms import py_cpu_nms
-from detection.box.box_utils import decode, decode_landm
+from face_recognition.detection.config import cfg_mnet, cfg_re50
+from face_recognition.detection.box.prior_box import PriorBox
+from face_recognition.detection.nms.py_cpu_nms import py_cpu_nms
+from face_recognition.detection.box.box_utils import decode, decode_landm
 
 
 class FaceDetector:

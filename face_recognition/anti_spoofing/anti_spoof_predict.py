@@ -7,13 +7,12 @@
 
 import os
 import torch
-import numpy as np
 import torch.nn.functional as F
 
 
-from anti_spoofing.model_lib.MiniFASNet import MiniFASNetV1, MiniFASNetV2,MiniFASNetV1SE,MiniFASNetV2SE
-from anti_spoofing.data_io import transform as trans
-from anti_spoofing.utility import get_kernel, parse_model_name
+from face_recognition.anti_spoofing.model_lib.MiniFASNet import MiniFASNetV1, MiniFASNetV2,MiniFASNetV1SE,MiniFASNetV2SE
+from face_recognition.anti_spoofing.data_io import transform as trans
+from face_recognition.anti_spoofing import get_kernel, parse_model_name
 
 MODEL_MAPPING = {
     'MiniFASNetV1': MiniFASNetV1,

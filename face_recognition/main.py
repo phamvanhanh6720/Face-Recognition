@@ -9,13 +9,11 @@ import unidecode
 import onnxruntime as ort
 from sklearn.metrics.pairwise import cosine_similarity
 
-from utils.process import *
-from utils import tracking
-from utils import find_max_bbox
-from detection import FaceDetector
-from align import warp_and_crop_face, get_reference_facial_points
-from anti_spoofing.detect_spoof import detect_spoof
-from anti_spoofing.anti_spoof_predict import AntiSpoofPredict
+from face_recognition.utils.process import *
+from face_recognition.utils import tracking, find_max_bbox
+from face_recognition.detection import FaceDetector
+from face_recognition.align import warp_and_crop_face, get_reference_facial_points
+from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
 
 # Turn off warnming
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -58,8 +56,8 @@ if __name__ == "__main__":
     # print(X.shape)
     # print(y.shape)
 
-    faceDetector = FaceDetector(onnx_path="./weights/detection_model/FaceDetector_640.onnx")
-    model_dir = './weights/anti_spoof_models'
+    faceDetector = FaceDetector(onnx_path="/home/phamvanhanh/PycharmProjects/FaceRecognition/weights/detection_model/FaceDetector_640.onnx")
+    model_dir = '/home/phamvanhanh/PycharmProjects/FaceRecognition/weights/anti_spoof_models'
     model_test = {}
     for model_name in os.listdir(model_dir):
         model_test[model_name] = AntiSpoofPredict(os.path.join(model_dir, model_name))
@@ -69,7 +67,7 @@ if __name__ == "__main__":
     device = torch.device('cpu' if args.cpu else 'cuda:0')
 
     # Feature Extraction Model
-    arcface_onnx_path = os.path.join("weights/embedding_model/ArcFace_R50.onnx")
+    arcface_onnx_path = os.path.join("/home/phamvanhanh/PycharmProjects/FaceRecognition/weights/embedding_model/ArcFace_R50.onnx")
     arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
     input_name = arcface_r50_asian.get_inputs()[0].name
 

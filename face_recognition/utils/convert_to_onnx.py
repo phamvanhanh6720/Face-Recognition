@@ -1,11 +1,11 @@
 import torch
 from pathlib import Path
 
-from extract_feature.model_irse import IR_50
-from detection.config import cfg_mnet, cfg_re50
-from detection.retinaface import RetinaFace
-from anti_spoofing.anti_spoof_predict import AntiSpoofPredict
-from detection.load_model import load_model
+from face_recognition.extract_feature import IR_50
+from face_recognition.detection.config import cfg_mnet, cfg_re50
+from face_recognition.detection.retinaface import RetinaFace
+from face_recognition.anti_spoofing.anti_spoof_predict import AntiSpoofPredict
+from face_recognition.detection import load_model
 
 
 def convert_arc_face_model(weight_path: Path, output_path: Path, crop_size, opset=11):
@@ -98,6 +98,6 @@ def convert_spoof_model(weight_path, output_path, img_size, architecture):
 if __name__ == "__main__":
     model_path = '/weights/embedding_model/backbone_ir50_asia.pth'
     crop_size = 112
-    output_path = '../weights/embedding_model/ArcFace_R50.onnx'
+    output_path = '../../weights/embedding_model/ArcFace_R50.onnx'
     convert_arc_face_model(model_path, output_path, crop_size)
 

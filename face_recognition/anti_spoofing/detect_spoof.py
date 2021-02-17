@@ -1,8 +1,8 @@
 import numpy as np
 import time
 
-from anti_spoofing.utility import parse_model_name
-from anti_spoofing.utility import CropImage
+from face_recognition.anti_spoofing import parse_model_name
+from face_recognition.anti_spoofing import CropImage
 
 def detect_spoof(all_models, image_bbox, original_img):
 

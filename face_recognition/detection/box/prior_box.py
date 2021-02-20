@@ -28,7 +28,9 @@ class PriorBox(object):
                         anchors += [cx, cy, s_kx, s_ky]
 
         # back to torch land
-        output = torch.Tensor(anchors).view(-1, 4)
+        # output = torch.Tensor(anchors).view(-1, 4)
+        output = np.array(anchors).reshape((-1, 4))
         if self.clip:
-            output.clamp_(max=1, min=0)
+            # output.clamp_(max=1, min=0)
+            output = np.clip(output, a_min=0, a_max=1)
         return output

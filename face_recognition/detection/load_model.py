@@ -1,5 +1,6 @@
 import torch
-
+from .retinaface import RetinaFace
+from .config import cfg_mnet, cfg_re50
 
 def check_keys(model, pretrained_state_dict):
     ckpt_keys = set(pretrained_state_dict.keys())
@@ -35,3 +36,18 @@ def load_model(model, pretrained_path, load_to_cpu):
     check_keys(model, pretrained_dict)
     model.load_state_dict(pretrained_dict, strict=False)
     return model
+
+
+def detection_model(weight_path: str, cpu: bool, network: str):
+
+    assert network in ['mobile0.25', 'resnet50']
+    cfg = None
+    if network == "mobile0.25":
+        cfg = cfg_mnet
+    elif network == "resnet50":
+        cfg = cfg_re50
+    net = RetinaFace(cfg=cfg, phase = 'test')
+    net = load_model(net, weight_path, cpu)
+    net.eval()
+
+    return net

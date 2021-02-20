@@ -1,13 +1,18 @@
 import os
 import glob
+import torch
 import warnings
 from queue import Queue
 from typing import List, Optional, Tuple
-from argparse import ArgumentParser
 
 import torch
 import unidecode
 import onnxruntime as ort
+try:
+    from torch2trt import torch2trt
+except Exception as e:
+    print(e)
+    pass
 from sklearn.metrics.pairwise import cosine_similarity
 
 from face_recognition.utils.process import *
@@ -21,17 +26,20 @@ from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-def main(device=0, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
-    parser = ArgumentParser()
-    parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
-    parser.add_argument("-label", "--label", default="./dataset/label.txt", type=str)
-    parser.add_argument("-cpu", "--cpu", default=True, type=str)
 
-    args = parser.parse_args()
-    reference = get_reference_facial_points(default_square=True)
+def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
+
+    # Config
+    label_file = './dataset/label.txt'
+    embeddings_folder = './dataset/embeddings'
+    cpu = not torch.cuda.is_available()
+    print(cpu)
+    device = torch.device('cpu' if cpu else 'cuda:0')
+
+
     all_labels = dict()
     try:
-        with open(args.label, 'r', encoding='utf-8') as file:
+        with open(label_file, 'r', encoding='utf-8') as file:
             for line in file.readlines():
                 idx = [i for i in range(len(line)) if line[i]==" "]
                 name = line[: idx[-1]]
@@ -42,7 +50,7 @@ def main(device=0, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.
     except Exception as e:
         print(e)
     print(all_labels)
-    files = glob.glob(args.embeddings_path + "/" + "*.npz")
+    files = glob.glob(embeddings_folder + "/" + "*.npz")
 
     # embeddings vector of all people in dataset
     X = list()
@@ -57,8 +65,11 @@ def main(device=0, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.
     config: dict = Cfg.load_config()
 
     # Load Face Detection Model
-    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_640_onnx'])
-    face_detector = FaceDetector(onnx_path=detection_model_path)
+    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_pytorch'])
+    face_detector = FaceDetector(detection_model_path, cpu=cpu, tensorrt=tensorrt)
+
+    # Load reference of Alginment
+    reference = get_reference_facial_points(default_square=True)
 
     # Load Face Anti Spoof Models
     anti_spoof_names: List[str] = config['anti_spoof_name']
@@ -77,8 +88,9 @@ def main(device=0, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.
     current_state: Optional[tuple] = None
 
     # Camera Configure
-    camera_url = config['camera_url'] if device is None else None
-    camera = cv2.VideoCapture(device) if camera_url is None else cv2.VideoCapture(camera_url)
+    camera_url = config['camera_url'] if cam_device is None else None
+    print(camera_url)
+    camera = cv2.VideoCapture(cam_device) if camera_url is None else cv2.VideoCapture(camera_url)
     count = 0
 
     while True:

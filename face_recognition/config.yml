@@ -11,3 +11,10 @@ weights:
     anti_spoof_models:
         2.7_80x80_MiniFASNetV2: https://drive.google.com/uc?id=1hWihYFCbK1zutOk-ZhZVsbvjGGomGti1&export=download
         4_0_0_80x80_MiniFASNetV1SE: https://drive.google.com/uc?id=1LQRhqSNAKiNSLtYb_KClT2TGJg06vrsA&export=download
+
+postgres_db:
+  host: localhost
+  user: postgres
+  password: postgres
+  database: FaceRecognition_Project
+  port: 5432

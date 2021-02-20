@@ -21,8 +21,7 @@ from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-
-def main(device=0):
+def main(device=0, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
     parser = ArgumentParser()
     parser.add_argument("-embeddings_path", "--embeddings_path", default="./dataset/embeddings", type=str)
     parser.add_argument("-label", "--label", default="./dataset/label.txt", type=str)
@@ -93,10 +92,10 @@ def main(device=0):
             original_img = np.copy(frame)
             bounding_boxes = face_detector.detect(frame)
 
-            remove_rows = list(np.where(bounding_boxes[:, 4] < 0.6)[0]) # score_thresold
+            remove_rows = list(np.where(bounding_boxes[:, 4] < score_threshold)[0]) # score_thresold
             bounding_boxes = np.delete(bounding_boxes, remove_rows, axis=0)
 
-            if bounding_boxes.shape[0] != 0 and find_max_bbox(bounding_boxes) is not None:
+            if bounding_boxes.shape[0] != 0 and find_max_bbox(bounding_boxes, area_threshold=area_threshold) is not None:
                 max_bbox = find_max_bbox(bounding_boxes)
 
                 coordinate = [max_bbox[0], max_bbox[1], max_bbox[2], max_bbox[3]]   # x1, y1, x2, y2
@@ -121,7 +120,7 @@ def main(device=0):
                 idx = np.argmax(similarity, axis=-1)
                 cosin = float(similarity[0, idx])
 
-                if cosin < 0.4:
+                if cosin < cosin_threshold:
                     name = "unknown"
                 else:
                     label = int(y[idx])

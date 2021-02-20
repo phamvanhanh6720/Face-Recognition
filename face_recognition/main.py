@@ -6,9 +6,11 @@ import warnings
 from queue import Queue
 from typing import List, Optional, Tuple
 
+import cv2
+import numpy as np
 import torch
 import unidecode
-import onnxruntime as ort
+from torchvision import transforms
 try:
     from torch2trt import torch2trt
 except Exception as e:
@@ -16,27 +18,26 @@ except Exception as e:
     pass
 from sklearn.metrics.pairwise import cosine_similarity
 
-from face_recognition.utils.process import *
+from face_recognition.utils import draw_box
 from face_recognition.utils import find_max_bbox, Cfg, download_weights
 from face_recognition.utils import track_queue, check_change
 from face_recognition.detection import FaceDetector
 from face_recognition.align import warp_and_crop_face, get_reference_facial_points
 from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
+from face_recognition.extract_feature import IR_50
 
 # Turn off warnming
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
+def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
     # Config
     label_file = './dataset/label.txt'
     embeddings_folder = './dataset/embeddings'
     cpu = not torch.cuda.is_available()
-    print(cpu)
     device = torch.device('cpu' if cpu else 'cuda:0')
-
 
     all_labels = dict()
     try:
@@ -80,9 +81,18 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
         model_spoofing[model_name] = AntiSpoofPredict(model_path=path, model_name=model_name)
 
     # Load Embedding Model
-    arcface_onnx_path = download_weights(config['weights']['embedding_models']['ArcFace_R50_onnx'])
-    arcface_r50_asian = ort.InferenceSession(arcface_onnx_path)
-    input_name = arcface_r50_asian.get_inputs()[0].name
+    preprocess = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    arcface_path = download_weights(config['weights']['embedding_models']['ArcFace_pytorch'])
+    arcface_r50_asian = IR_50(input_size=[112, 112])
+    arcface_r50_asian.load_state_dict(torch.load(arcface_path, map_location=device))
+    arcface_r50_asian.eval()
+    arcface_r50_asian.to(device=device)
+
+    if not cpu and tensorrt:
+        x = torch.ones((1, 3, 112, 112), device=device)
+        arcface_r50_asian = torch2trt(arcface_r50_asian, [x])
 
     # Queue for tracking face
     faces_queue = Queue(maxsize=7)
@@ -103,9 +113,7 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
 
             original_img = np.copy(frame)
 
-            start = time.time()
             bounding_boxes = face_detector.detect(frame)
-            print("Detection time: {}".format(time.time() - start))
             remove_rows = list(np.where(bounding_boxes[:, 4] < score_threshold)[0]) # score_threshold
             bounding_boxes = np.delete(bounding_boxes, remove_rows, axis=0)
 
@@ -122,12 +130,11 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
 
                 # Get extract_feature
                 warped_face2 = warp_and_crop_face(
-                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference,
-                    (112, 112))
+                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
                 input_embedding = preprocess(warped_face2)
-                embedding = arcface_r50_asian.run(None, {input_name: input_embedding})
-                embedding = np.array(embedding)
-                embedding = np.squeeze(embedding, axis=0)
+                input_embedding = torch.unsqueeze(input_embedding, 0)
+                embedding = arcface_r50_asian(input_embedding)
+                embedding = embedding.detach().cpu().numpy() if not cpu else embedding.detach().numpy()
 
                 # Calculate similarity
                 similarity = cosine_similarity(embedding, X)
@@ -166,4 +173,4 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
 
 
 if __name__ == '__main__':
-    main()
+    main(tensorrt=False, cam_device=0)

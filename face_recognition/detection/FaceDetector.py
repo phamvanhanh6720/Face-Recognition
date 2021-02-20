@@ -57,6 +57,21 @@ class FaceDetector:
                                 self.input_size[1], self.input_size[0], self.input_size[1], self.input_size[0],
                                self.input_size[1], self.input_size[0]])
 
+    def preprocess(self, image_raw):
+        img = np.float32(image_raw)
+        try:
+            im_height, im_width, _ = img.shape
+            if im_height != self.input_size[0] or im_width != self.input_size[1]:
+                raise Exception('Frame size must be {}'.format(self.input_size))
+        except Exception as e:
+            print(e)
+
+        img -= (104, 117, 123)
+        img = img.transpose(2, 0, 1)
+        batch_a = np.expand_dims(img, axis=0)
+
+        return batch_a
+
     def detect(self, image_raw):
         """
             Detect face from single image
@@ -64,17 +79,7 @@ class FaceDetector:
             :return:
         """
 
-        # preprocess input image
-        img = np.float32(image_raw)
-        try:
-            im_height, im_width, _ = img.shape
-        except Exception as e:
-            print(e)
-
-        img -= (104, 117, 123)
-        img = img.transpose(2, 0, 1)
-        batch_a = np.expand_dims(img, axis=0)
-        batch = torch.as_tensor(batch_a, device=self.device)
+        batch = torch.as_tensor(self.preprocess(image_raw), device=self.device)
 
         # forward pass
         loc, conf, landmarks = self.model(batch)

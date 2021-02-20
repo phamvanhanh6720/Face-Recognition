@@ -6,7 +6,6 @@ weights:
     face_detections:
         FaceDetector_480_onnx: https://drive.google.com/uc?id=1x7eeCvGesAHpEujRDJeQoBATqRHaiN6p&export=download
         FaceDetector_640_onnx: https://drive.google.com/uc?id=1JmiqwvLibzAVO863_FpUNhefkD2r_hiU&export=download
-        # no fix size of input
         FaceDetector_pytorch: https://drive.google.com/uc?id=1n8hT9dHSU5ELUMlrkJP9_qi79KXKMjEu&export=download
     embedding_models:
         ArcFace_R50_onnx: https://drive.google.com/uc?id=117NH1r0bJQs3q88KKNU3X7-6RTtLQHCe&export=download

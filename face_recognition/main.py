@@ -1,6 +1,7 @@
 import os
 import glob
 import torch
+import time
 import warnings
 from queue import Queue
 from typing import List, Optional, Tuple
@@ -66,9 +67,9 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
 
     # Load Face Detection Model
     detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_pytorch'])
-    face_detector = FaceDetector(detection_model_path, cpu=cpu, tensorrt=tensorrt)
+    face_detector = FaceDetector(detection_model_path, cpu=cpu, tensorrt=tensorrt, input_size=(480, 640))
 
-    # Load reference of Alginment
+    # Load reference of alignment
     reference = get_reference_facial_points(default_square=True)
 
     # Load Face Anti Spoof Models
@@ -89,7 +90,6 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
 
     # Camera Configure
     camera_url = config['camera_url'] if cam_device is None else None
-    print(camera_url)
     camera = cv2.VideoCapture(cam_device) if camera_url is None else cv2.VideoCapture(camera_url)
     count = 0
 
@@ -102,9 +102,11 @@ def main(cam_device=0, tensorrt: bool = True, area_threshold=10000, score_thresh
         if count % 6 == 0:
 
             original_img = np.copy(frame)
-            bounding_boxes = face_detector.detect(frame)
 
-            remove_rows = list(np.where(bounding_boxes[:, 4] < score_threshold)[0]) # score_thresold
+            start = time.time()
+            bounding_boxes = face_detector.detect(frame)
+            print("Detection time: {}".format(time.time() - start))
+            remove_rows = list(np.where(bounding_boxes[:, 4] < score_threshold)[0]) # score_threshold
             bounding_boxes = np.delete(bounding_boxes, remove_rows, axis=0)
 
             if bounding_boxes.shape[0] != 0 and find_max_bbox(bounding_boxes, area_threshold=area_threshold) is not None:

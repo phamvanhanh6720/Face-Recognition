@@ -61,7 +61,7 @@ def track_queue(face_queue: Queue, queue_size=7) -> Tuple[bool, Optional[str], O
     return (False, None, None)
 
 
-def check_change(result_tracking, current_state) -> None:
+def check_change(result_tracking, current_state) :
     if current_state == result_tracking:
         if current_state[2] is not None:
             print("Dont push to web client: {}___{}".format(current_state[2], current_state[1]))

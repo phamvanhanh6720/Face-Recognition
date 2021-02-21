@@ -1,0 +1,12 @@
+postgres_db:
+  host: localhost
+  user: postgres
+  password: postgres
+  database: FaceRecognition_Project
+  port: 5432
+
+weights:
+    face_detections:
+        FaceDetector_pytorch: https://drive.google.com/uc?id=1n8hT9dHSU5ELUMlrkJP9_qi79KXKMjEu&export=download
+    embedding_models:
+        ArcFace_pytorch: https://drive.google.com/uc?id=1hFfWEd44jXSqBTywl2KoVx6i8vZZbS7l&export=download

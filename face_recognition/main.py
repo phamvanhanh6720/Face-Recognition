@@ -1,14 +1,12 @@
-import os
 import glob
-import torch
 import time
 import warnings
 from queue import Queue
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import cv2
-import numpy as np
 import torch
+import numpy as np
 import unidecode
 from torchvision import transforms
 try:
@@ -18,6 +16,7 @@ except Exception as e:
     pass
 from sklearn.metrics.pairwise import cosine_similarity
 
+from face_recognition.dao import Connector
 from face_recognition.utils import draw_box
 from face_recognition.utils import find_max_bbox, Cfg, download_weights
 from face_recognition.utils import track_queue, check_change
@@ -33,37 +32,13 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
-    # Config
-    label_file = './dataset/label.txt'
-    embeddings_folder = './dataset/embeddings'
+    # Load embeddings and labels
+    connector = Connector()
+    names_list, X = connector.load_embeddings()
+
+    # base configure
     cpu = not torch.cuda.is_available()
     device = torch.device('cpu' if cpu else 'cuda:0')
-
-    all_labels = dict()
-    try:
-        with open(label_file, 'r', encoding='utf-8') as file:
-            for line in file.readlines():
-                idx = [i for i in range(len(line)) if line[i]==" "]
-                name = line[: idx[-1]]
-                l = line[idx[-1]:]
-
-                l = int(l.split("\n")[0])
-                all_labels[l] = name
-    except Exception as e:
-        print(e)
-    print(all_labels)
-    files = glob.glob(embeddings_folder + "/" + "*.npz")
-
-    # embeddings vector of all people in dataset
-    X = list()
-    y = list()
-    for file in files:
-        npzfile = np.load(file)
-        X.append(npzfile['arr_0'])
-        y.append(npzfile['arr_1'])
-    X = np.concatenate(X, axis=0)
-    y = np.concatenate(y, axis=0)
-
     config: dict = Cfg.load_config()
 
     # Load Face Detection Model
@@ -125,7 +100,8 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
 
                 # Face Anti Spoofing
                 # image_bbox: x_top_left, y_top_left, width, height
-                image_bbox = [int(max_bbox[0]), int(max_bbox[1]), int(max_bbox[2]-max_bbox[0]), int(max_bbox[3]-max_bbox[1])]
+                image_bbox = [int(max_bbox[0]), int(max_bbox[1]),
+                              int(max_bbox[2]-max_bbox[0]), int(max_bbox[3]-max_bbox[1])]
                 spoof = detect_spoof(model_spoofing, image_bbox, original_img)
 
                 # Get extract_feature
@@ -144,12 +120,12 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
                 if cosin < cosin_threshold:
                     name = "unknown"
                 else:
-                    label = int(y[idx])
-                    name = unidecode.unidecode(all_labels[label])
+                    name = unidecode.unidecode(names_list[idx[0]])
 
+                # Draw box
                 draw_box(frame, coordinate, cosin, name, spoof)
 
-                faces_queue.put({'label':name, 'spoof': spoof})
+                faces_queue.put({'label': name, 'spoof': spoof})
             else:
                 faces_queue.put({'label': "None", 'spoof': 0})
 

@@ -1,4 +1,3 @@
-from app import app
-
+from face_recognition import main
 if __name__ == '__main__':
-    app.run(debug=True, threaded=True)
+    main(tensorrt=False, cam_device=0)

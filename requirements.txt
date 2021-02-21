@@ -10,3 +10,4 @@ Pillow==8.0.1
 PyYAML==5.4.1
 gdown==3.12.2
 requests==2.25.1
+importlib_resources==5.1.0

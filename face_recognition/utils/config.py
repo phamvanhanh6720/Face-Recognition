@@ -1,5 +1,6 @@
 import yaml
-from importlib import resources
+import os
+# from importlib import resources
 
 
 class Cfg(dict):
@@ -14,7 +15,7 @@ class Cfg(dict):
         Returns: Dict
 
         """
-        with resources.open_text('face_recognition', 'config.yml') as ymlfile:
+        with open(os.path.join('face_recognition', 'config.yml')) as ymlfile:
             cfg = yaml.safe_load(ymlfile)
 
         return Cfg(cfg)

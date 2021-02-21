@@ -34,7 +34,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
     # Config
-    label_file = './dataset/label.txt'
+    label_file = 'dataset/label.txt'
     embeddings_folder = './dataset/embeddings'
     cpu = not torch.cuda.is_available()
     device = torch.device('cpu' if cpu else 'cuda:0')
@@ -108,9 +108,8 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
 
         if not ret:
             break
-
         if count % 6 == 0:
-
+            start = time.time()
             original_img = np.copy(frame)
 
             bounding_boxes = face_detector.detect(frame)
@@ -133,6 +132,8 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
                 input_embedding = preprocess(warped_face2)
                 input_embedding = torch.unsqueeze(input_embedding, 0)
+                if not cpu:
+                    input_embedding = input_embedding.to(device=device)
                 embedding = arcface_r50_asian(input_embedding)
                 embedding = embedding.detach().cpu().numpy() if not cpu else embedding.detach().numpy()
 
@@ -163,7 +164,7 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
+            print('Time frame ', time.time() - start)
         count += 1
         if count > 10000:
             count = 0

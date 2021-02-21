@@ -59,13 +59,6 @@ class FaceDetector:
 
     def preprocess(self, image_raw):
         img = np.float32(image_raw)
-        try:
-            im_height, im_width, _ = img.shape
-            if im_height != self.input_size[0] or im_width != self.input_size[1]:
-                raise Exception('Frame size must be {}'.format(self.input_size))
-        except Exception as e:
-            print(e)
-
         img -= (104, 117, 123)
         img = img.transpose(2, 0, 1)
         batch_a = np.expand_dims(img, axis=0)

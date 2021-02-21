@@ -2,7 +2,7 @@ import glob
 import time
 import warnings
 from queue import Queue
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import cv2
 import torch
@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
+def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
     # Load embeddings and labels
     connector = Connector()
@@ -43,7 +43,7 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
 
     # Load Face Detection Model
     detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_pytorch'])
-    face_detector = FaceDetector(detection_model_path, cpu=cpu, tensorrt=tensorrt, input_size=(480, 640))
+    face_detector = FaceDetector(detection_model_path, cpu=cpu, tensorrt=tensorrt, input_size=input_size)
 
     # Load reference of alignment
     reference = get_reference_facial_points(default_square=True)
@@ -80,6 +80,10 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
 
     while True:
         ret, frame = camera.read()
+
+        im_height, im_width, _ = frame.shape
+        if im_height != input_size[0] or im_width != input_size[1]:
+            raise Exception('Frame size must be {}'.format(input_size))
 
         if not ret:
             break

@@ -1,5 +1,4 @@
 import psycopg2
-import yaml
 import pickle
 import numpy as np
 from typing import Optional, List, Tuple
@@ -7,7 +6,7 @@ from typing import Optional, List, Tuple
 from ..utils import Cfg
 
 
-class Connector():
+class Connector:
     def __init__(self):
         # load database information
         db_config = Cfg.load_config()['postgres_db']
@@ -67,5 +66,3 @@ if __name__ == '__main__':
     name_list, X = connector.load_embeddings()
     print(name_list)
     print(X[0])
-
-

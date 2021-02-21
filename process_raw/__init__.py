@@ -1,1 +1,1 @@
-from .store import  store_all
+from .store import store_all, store_one

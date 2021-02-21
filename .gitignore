@@ -6,3 +6,5 @@ weights
 .idea/
 *.zip
 *.cpython-38.pyc
+/face_recognition/torch2trt/
+/venv/

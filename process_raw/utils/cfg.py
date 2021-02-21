@@ -1,5 +1,8 @@
 import yaml
-from importlib import resources
+try:
+    from importlib import resources
+except ImportError:
+    import importlib_resources as resources
 
 
 class Cfg(dict):

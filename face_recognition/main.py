@@ -109,6 +109,8 @@ def main(tensorrt: bool, cam_device: Optional[int], area_threshold=10000, score_
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
                 input_embedding = preprocess(warped_face2)
                 input_embedding = torch.unsqueeze(input_embedding, 0)
+                if not cpu:
+                    input_embedding.to(device=device)
                 embedding = arcface_r50_asian(input_embedding)
                 embedding = embedding.detach().cpu().numpy() if not cpu else embedding.detach().numpy()
 

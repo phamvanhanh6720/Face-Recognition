@@ -1,5 +1,4 @@
 import psycopg2
-import yaml
 import pickle
 import numpy as np
 from typing import Optional, List

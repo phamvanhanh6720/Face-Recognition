@@ -25,8 +25,10 @@ def store_all(datasets: str):
         datasets: file path to specify dataset folders, which contains some directories whose name is id of a person
 
     Returns: None
-
     """
+
+    assert os.path.exists(datasets), "Folder is not exist"
+
     device = torch.device('cpu')
     # load config
     config = Cfg.load_config()
@@ -106,7 +108,8 @@ def store_one(folder_path: str):
     Returns:
 
     """
-    assert isinstance(int(folder_path.split('/')[-1]), int), "Folder name must be integer and is ID of person"
+    assert str(folder_path.split('/')[-1]).isdigit(), "Folder name must be integer and is ID of person"
+    assert os.path.exists(folder_path), "Folder is not exist"
 
     device = torch.device('cpu')
     # load config
@@ -176,7 +179,7 @@ def store_one(folder_path: str):
 if __name__ == '__main__':
     cropped_images = [np.arange(6)]
     embeddings = np.arange(6)
-    store_one('/home/phamvanhanh/PycharmProjects/FaceRecognition/45')
+    store_one('/home/phamvanhanh/PycharmProjects/FaceRecognition/56')
 
 
 

@@ -114,7 +114,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 input_embedding = preprocess(warped_face2)
                 input_embedding = torch.unsqueeze(input_embedding, 0)
                 if not cpu:
-                    input_embedding.to(device=device)
+                    input_embedding = input_embedding.to(device=device)
                 embedding = arcface_r50_asian(input_embedding)
                 embedding = embedding.detach().cpu().numpy() if not cpu else embedding.detach().numpy()
 

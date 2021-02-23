@@ -20,3 +20,5 @@ postgres_db:
   password: postgres
   database: FaceRecognition_Project
   port: 5432
+
+init_db: createdatabase.sql

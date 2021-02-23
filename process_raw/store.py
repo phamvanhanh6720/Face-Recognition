@@ -10,8 +10,9 @@ import torch
 from torchvision import transforms
 from sklearn.metrics.pairwise import cosine_similarity
 
-from process_raw.dao import Connector
+from process_raw.dao import StudentDAO
 from process_raw.utils import FaceDetector, Cfg
+from face_recognition.dao import Student
 from face_recognition.align import warp_and_crop_face, get_reference_facial_points
 from face_recognition.extract_feature import IR_50
 from face_recognition.utils import download_weights, find_max_bbox
@@ -32,7 +33,7 @@ def store_all(datasets: str):
     device = torch.device('cpu')
     # load config
     config = Cfg.load_config()
-    connector = Connector()
+    studentDao = StudentDAO()
 
     # load face detection
     detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_pytorch'])
@@ -94,7 +95,8 @@ def store_all(datasets: str):
                         cropped_images.append(warped_face2)
 
         print("Total face: {}".format(len(cropped_images)))
-        connector.store_one_person(id=id, name=name, cropped_images=cropped_images, embeddings=embeddings)
+        student = Student(id, name, cropped_images, embeddings)
+        studentDao.store_one_person(student)
         print("-" * 20)
 
 

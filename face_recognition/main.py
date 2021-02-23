@@ -16,7 +16,7 @@ except Exception as e:
     pass
 from sklearn.metrics.pairwise import cosine_similarity
 
-from face_recognition.dao import Connector
+from face_recognition.dao import StudentDAO
 from face_recognition.utils import draw_box
 from face_recognition.utils import find_max_bbox, Cfg, download_weights
 from face_recognition.utils import track_queue, check_change
@@ -33,8 +33,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
     # Load embeddings and labels
-    connector = Connector()
-    names_list, X = connector.load_embeddings()
+    studentDao = StudentDAO()
+    names_list, X = studentDao.load_embeddings()
 
     # base configure
     cpu = not torch.cuda.is_available()
@@ -89,7 +89,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
             break
 
         if count % 6 == 0:
-
+            start = time.time()
             original_img = np.copy(frame)
 
             bounding_boxes = face_detector.detect(frame)
@@ -145,7 +145,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
+            print('Time frame ', time.time() - start)
         count += 1
         if count > 10000:
             count = 0

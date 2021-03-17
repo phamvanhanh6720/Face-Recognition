@@ -53,7 +53,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     model_spoofing = {}
     for model_name in anti_spoof_names:
         path = download_weights(config['weights']['anti_spoof_models'][model_name])
-        model_spoofing[model_name] = AntiSpoofPredict(model_path=path, model_name=model_name)
+        model_spoofing[model_name] = AntiSpoofPredict(model_path=path)
 
     # Load Embedding Model
     preprocess = transforms.Compose([

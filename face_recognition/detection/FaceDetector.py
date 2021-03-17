@@ -1,15 +1,10 @@
 import torch
 import numpy as np
-import time
 from typing import Tuple
 from torchvision import transforms
-try:
-    from torch2trt import torch2trt
-except Exception as e:
-    print(e)
-    pass
+import onnx
+import onnx_tensorrt.backend as backend
 
-from face_recognition.detection.load_model import detection_model
 from face_recognition.detection.config import cfg_mnet, cfg_re50
 from face_recognition.detection.box.prior_box import PriorBox
 from face_recognition.detection.nms.py_cpu_nms import py_cpu_nms
@@ -17,23 +12,25 @@ from face_recognition.detection.box.box_utils import decode, decode_landm
 
 
 class FaceDetector:
-    def __init__(self, weight_path: str, cpu: bool, tensorrt: bool, input_size: Tuple[int, int], network='mobile0.25',
+    def __init__(self, weight_path: str, input_size: Tuple[int, int], network='mobile0.25',
                  confidence_threshold=0.02, top_k=5000, nms_threshold=0.4, keep_top_k=750, vis_thres=0.6):
+        """
+        Args:
+            weight_path:
+            input_size: (height, width)
+            network: default mobile0.25
+            confidence_threshold:
+            top_k:
+            nms_threshold:
+            keep_top_k:
+            vis_thres:
+        """
 
         self.input_size = input_size
-        self.cpu = cpu
-        self.device = torch.device('cpu' if cpu else 'cuda:0')
-
         # load model and configure of model
         self.network = network
-        model = detection_model(weight_path, cpu=cpu, network=self.network)
-        model.to(self.device)
-        if not cpu and tensorrt:
-            temp_size = (1, 3, input_size[0], input_size[1])
-            x = torch.ones(temp_size, device='cpu' if cpu else 'cuda:0')
-            self.model = torch2trt(model, [x])
-        else:
-            self.model = model
+        self.model = onnx.load(weight_path)
+        self.engine = backend.prepare(self.model, device='CUDA:0')
 
         self.cfg = None
         if self.network == "mobile0.25":
@@ -42,7 +39,7 @@ class FaceDetector:
             setattr(self, 'cfg', cfg_re50)
         else:
             raise (Exception("Invalid NetWork"))
-        self.cfg["pretrain"] = False
+        self.cfg['pretrain'] = False
 
         # decode configure
         self.resize = 1
@@ -60,7 +57,8 @@ class FaceDetector:
     def preprocess(self, image_raw):
         img = np.float32(image_raw)
         img -= (104, 117, 123)
-        img = img.transpose(2, 0, 1)
+        img = np.transpose(img, [2, 0, 1])
+        img = np.array(img, dtype=img.dtype, order='C')
         batch_a = np.expand_dims(img, axis=0)
 
         return batch_a
@@ -72,18 +70,13 @@ class FaceDetector:
             :return:
         """
 
-        batch = torch.as_tensor(self.preprocess(image_raw), device=self.device)
+        batch = self.preprocess(image_raw)
 
         # forward pass
-        loc, conf, landmarks = self.model(batch)
+        output = self.engine.run(batch)
+        loc, landmarks, conf = output[0], output[1], output[2]
         # start = time.time()
-        loc, conf, landmarks = loc.detach(), conf.detach(), landmarks.detach()
-        if not self.cpu:
-            loc = loc.cpu()
-            conf = conf.cpu()
-            landmarks = landmarks.cpu()
-
-        loc, conf, landmarks = loc.squeeze(0).numpy(), conf.squeeze(0).numpy(), landmarks.squeeze(0).numpy()
+        loc, conf, landmarks = loc.squeeze(0), conf.squeeze(0), landmarks.squeeze(0)
 
         # decode bounding box
         boxes = decode(loc, self.prior_data, self.cfg['variance'])
@@ -120,3 +113,14 @@ class FaceDetector:
         dets = np.concatenate((dets, landmarks), axis=1)
 
         return dets
+
+
+if __name__ == '__main__':
+    from face_recognition.utils import download_weights
+    from face_recognition.utils import Cfg
+    config = Cfg.load_config()
+    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_480_onnx'])
+    face_detector = FaceDetector(weight_path=detection_model_path, input_size=(480, 640))
+    input_fake = np.random.randint(0, 255, size=(480, 640, 3))
+
+    dets = face_detector.detect(input_fake)

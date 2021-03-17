@@ -6,14 +6,12 @@ from typing import List, Optional, Tuple
 
 import cv2
 import torch
+import onnx
 import numpy as np
 import unidecode
+import onnx_tensorrt.backend as backend
 from torchvision import transforms
-try:
-    from torch2trt import torch2trt
-except Exception as e:
-    print(e)
-    pass
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 from face_recognition.dao import StudentDAO
@@ -42,8 +40,8 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     config: dict = Cfg.load_config()
 
     # Load Face Detection Model
-    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_pytorch'])
-    face_detector = FaceDetector(detection_model_path, cpu=cpu, tensorrt=tensorrt, input_size=input_size)
+    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_480_onnx'])
+    face_detector = FaceDetector(detection_model_path, input_size=input_size)
 
     # Load reference of alignment
     reference = get_reference_facial_points(default_square=True)
@@ -59,15 +57,10 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     preprocess = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    arcface_path = download_weights(config['weights']['embedding_models']['ArcFace_pytorch'])
-    arcface_r50_asian = IR_50(input_size=[112, 112])
-    arcface_r50_asian.load_state_dict(torch.load(arcface_path, map_location=device))
-    arcface_r50_asian.eval()
-    arcface_r50_asian.to(device=device)
-
-    if not cpu and tensorrt:
-        x = torch.ones((1, 3, 112, 112), device=device)
-        arcface_r50_asian = torch2trt(arcface_r50_asian, [x])
+    arcface_path = download_weights(config['weights']['embedding_models']['ArcFace_R50_onnx'])
+    model_arcface = onnx.load(arcface_path)
+    arcface_engine = backend.prepare(model_arcface, device='CUDA:0')
+    del model_arcface
 
     # Queue for tracking face
     faces_queue = Queue(maxsize=7)
@@ -111,12 +104,10 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 # Get extract_feature
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
-                input_embedding = preprocess(warped_face2)
-                input_embedding = torch.unsqueeze(input_embedding, 0)
-                if not cpu:
-                    input_embedding = input_embedding.to(device=device)
-                embedding = arcface_r50_asian(input_embedding)
-                embedding = embedding.detach().cpu().numpy() if not cpu else embedding.detach().numpy()
+                input_embedding = preprocess(warped_face2).numpy()
+                input_embedding = np.expand_dims(input_embedding, axis=0)
+
+                embedding = arcface_engine.run(input_embedding)[0]
 
                 # Calculate similarity
                 similarity = cosine_similarity(embedding, X)

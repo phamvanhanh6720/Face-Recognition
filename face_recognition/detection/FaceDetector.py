@@ -29,8 +29,9 @@ class FaceDetector:
         self.input_size = input_size
         # load model and configure of model
         self.network = network
-        self.model = onnx.load(weight_path)
+        model = onnx.load(weight_path)
         self.engine = backend.prepare(self.model, device='CUDA:0')
+        del model
 
         self.cfg = None
         if self.network == "mobile0.25":

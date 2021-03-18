@@ -16,7 +16,7 @@ weights:
 postgres_db:
   host: localhost
   user: postgres
-  password: fgnQKJ54
+  password:
   database: FaceRecognition_Project
   port: 5432
 

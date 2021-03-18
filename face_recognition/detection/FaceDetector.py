@@ -3,7 +3,7 @@ import numpy as np
 from typing import Tuple
 from torchvision import transforms
 import onnx
-import onnx_tensorrt.backend as backend
+import onnxruntime as ort
 
 from face_recognition.detection.config import cfg_mnet, cfg_re50
 from face_recognition.detection.box.prior_box import PriorBox
@@ -30,8 +30,15 @@ class FaceDetector:
         # load model and configure of model
         self.network = network
         model = onnx.load(weight_path)
-        self.engine = backend.prepare(self.model, device='CUDA:0')
-        del model
+        providers = ['CPUExecutionProvider']
+        providers_options =[{
+            'device_id': '0',
+            'arena_extend_strategy': 'kNextPowerOfTwo',
+            'cuda_mem_limit': str(1 >> 15),
+            'cudnn_conv_algo_search': 'HEURISTIC'}]
+        self.ort_session = ort.InferenceSession(weight_path, providers=providers)
+        self.ort_input = self.ort_session.get_inputs()[0].name
+        self.ort_output = self.ort_session.get_outputs()[0].name
 
         self.cfg = None
         if self.network == "mobile0.25":
@@ -74,8 +81,8 @@ class FaceDetector:
         batch = self.preprocess(image_raw)
 
         # forward pass
-        output = self.engine.run(batch)
-        loc, landmarks, conf = output[0], output[1], output[2]
+        output = self.ort_session.run(None, {self.ort_input:batch})
+        loc, conf, landmarks = output[0], output[1], output[2]
         # start = time.time()
         loc, conf, landmarks = loc.squeeze(0), conf.squeeze(0), landmarks.squeeze(0)
 
@@ -125,3 +132,4 @@ if __name__ == '__main__':
     input_fake = np.random.randint(0, 255, size=(480, 640, 3))
 
     dets = face_detector.detect(input_fake)
+    print(dets.shape)

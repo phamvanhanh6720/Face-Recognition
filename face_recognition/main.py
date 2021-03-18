@@ -11,7 +11,6 @@ import numpy as np
 import unidecode
 import onnx_tensorrt.backend as backend
 from torchvision import transforms
-
 from sklearn.metrics.pairwise import cosine_similarity
 
 from face_recognition.dao import StudentDAO
@@ -21,13 +20,14 @@ from face_recognition.utils import track_queue, check_change
 from face_recognition.detection import FaceDetector
 from face_recognition.align import warp_and_crop_face, get_reference_facial_points
 from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
-from face_recognition.extract_feature import IR_50
+
 
 # Turn off warnming
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
+from memory_profiler import profile
 
-
+@profile()
 def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
     # Load embeddings and labels
@@ -40,6 +40,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     config: dict = Cfg.load_config()
 
     # Load Face Detection Model
+    print("Load Face Detection Model")
     detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_480_onnx'])
     face_detector = FaceDetector(detection_model_path, input_size=input_size)
 
@@ -47,6 +48,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     reference = get_reference_facial_points(default_square=True)
 
     # Load Face Anti Spoof Models
+    print("Load Face Anti Spoof Model")
     anti_spoof_names: List[str] = config['anti_spoof_name']
     model_spoofing = {}
     for model_name in anti_spoof_names:
@@ -138,12 +140,12 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 break
             print('Time frame ', time.time() - start)
         count += 1
-        if count > 10000:
-            count = 0
-
+        if count > 500:
+            #count = 0
+            break
     camera.release()
     cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
-    main(tensorrt=False, cam_device=0)
+    main(tensorrt=False, cam_device=0, input_size=(480, 640))

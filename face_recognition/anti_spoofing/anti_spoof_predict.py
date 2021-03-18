@@ -4,8 +4,9 @@ import torch.nn.functional as F
 from scipy.special import softmax
 
 from face_recognition.anti_spoofing.data_io import transform as trans
+from memory_profiler import profile
 
-
+@profile()
 class AntiSpoofPredict:
     def __init__(self, model_path):
         providers = ['CPUExecutionProvider']

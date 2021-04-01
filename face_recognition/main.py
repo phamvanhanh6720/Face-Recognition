@@ -97,9 +97,11 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
 
-                obj_base64string = codecs.encode(pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
+                obj_base64string = codecs.encode(
+                    pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
                 url = 'http://127.0.0.1:8000/recognition'
-                my_input = {'image': obj_base64string, 'use_base64': False, 'image_size': 112, 'threshold': 0.4}
+                my_input = {'input':
+                                {'image': obj_base64string, 'use_base64': False, 'image_size': 112, 'threshold': 0.4}}
                 result = requests.post(url, data=my_input)
                 print(result)
                 cosin = result['similarity']

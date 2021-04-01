@@ -1,4 +1,3 @@
-import glob
 import time
 import warnings
 from queue import Queue
@@ -6,8 +5,11 @@ from typing import List, Optional, Tuple
 
 import cv2
 import torch
+import codecs
+import pickle
 import onnx
 import numpy as np
+import requests
 import unidecode
 import onnx_tensorrt.backend as backend
 from torchvision import transforms
@@ -27,12 +29,9 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 from memory_profiler import profile
 
+
 @profile()
 def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
-
-    # Load embeddings and labels
-    studentDao = StudentDAO()
-    names_list, X = studentDao.load_embeddings()
 
     # base configure
     cpu = not torch.cuda.is_available()
@@ -54,15 +53,6 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     for model_name in anti_spoof_names:
         path = download_weights(config['weights']['anti_spoof_models'][model_name])
         model_spoofing[model_name] = AntiSpoofPredict(model_path=path)
-
-    # Load Embedding Model
-    preprocess = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    arcface_path = download_weights(config['weights']['embedding_models']['ArcFace_R50_onnx'])
-    model_arcface = onnx.load(arcface_path)
-    arcface_engine = backend.prepare(model_arcface, device='CUDA:0')
-    del model_arcface
 
     # Queue for tracking face
     faces_queue = Queue(maxsize=7)
@@ -106,20 +96,14 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 # Get extract_feature
                 warped_face2 = warp_and_crop_face(
                     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
-                input_embedding = preprocess(warped_face2).numpy()
-                input_embedding = np.expand_dims(input_embedding, axis=0)
 
-                embedding = arcface_engine.run(input_embedding)[0]
-
-                # Calculate similarity
-                similarity = cosine_similarity(embedding, X)
-                idx = np.argmax(similarity, axis=-1)
-                cosin = float(similarity[0, idx])
-
-                if cosin < cosin_threshold:
-                    name = "unknown"
-                else:
-                    name = unidecode.unidecode(names_list[idx[0]])
+                obj_base64string = codecs.encode(pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
+                url = 'http://127.0.0.1:8000/recognition'
+                my_input = {'image': obj_base64string, 'use_base64': False, 'image_size': 112, 'threshold': 0.4}
+                result = requests.post(url, data=my_input)
+                print(result)
+                cosin = result['similarity']
+                name = result['name']
 
                 # Draw box
                 draw_box(frame, coordinate, cosin, name, spoof)

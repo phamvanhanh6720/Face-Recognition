@@ -1,6 +1,6 @@
 anti_spoof_name: ['2.7_80x80_MiniFASNetV2', '4_0_0_80x80_MiniFASNetV1SE']
 
-camera_url:
+camera_url: http://192.168.1.5:4747/
 
 weights:
     face_detections:
@@ -14,9 +14,9 @@ weights:
         4_0_0_80x80_MiniFASNetV1SE: https://drive.google.com/uc?id=17kxrVKy4G_y-FKM0PNxIFh32mOTQR_cx&export=download
 
 postgres_db:
-  host: localhost
+  host: 192.168.1.7
   user: postgres
-  password:
+  password: postgres
   database: FaceRecognition_Project
   port: 5432
 

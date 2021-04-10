@@ -40,8 +40,8 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
     # Load Face Detection Model
     print("Load Face Detection Model")
-    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_480_onnx'])
-    face_detector = FaceDetector(detection_model_path, input_size=input_size)
+    detection_model_path = download_weights(config['weights']['face_detections']['FaceDetector_pytorch'])
+    face_detector = FaceDetector(detection_model_path, cpu=False, tensorrt=True, input_size=(480, 640))
 
     # Load reference of alignment
     reference = get_reference_facial_points(default_square=True)

@@ -7,6 +7,7 @@ import cv2
 import torch
 import codecs
 import pickle
+import json
 import onnx
 import numpy as np
 import requests
@@ -30,7 +31,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 from memory_profiler import profile
 
 
-@profile()
 def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4):
 
     # base configure
@@ -60,6 +60,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
     # Camera Configure
     camera_url = config['camera_url'] if cam_device is None else None
+    print(camera_url)
     camera = cv2.VideoCapture(cam_device) if camera_url is None else cv2.VideoCapture(camera_url)
     count = 0
 
@@ -99,11 +100,12 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
                 obj_base64string = codecs.encode(
                     pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
-                url = 'http://127.0.0.1:8000/recognition'
+                # url = 'http://127.0.0.1:8000/recognition'
+                url = 'http://42.114.166.123:14210/recognition'
                 my_input = {'input':
-                                {'image': obj_base64string, 'use_base64': False, 'image_size': 112, 'threshold': 0.4}}
-                result = requests.post(url, data=my_input)
-                print(result)
+                        {'image': obj_base64string, 'use_base64': False, 'image_size': 112, 'threshold': 0.4}}
+                result = requests.post(url, json=my_input)
+                result = result.json()
                 cosin = result['similarity']
                 name = result['name']
 
@@ -126,12 +128,12 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 break
             print('Time frame ', time.time() - start)
         count += 1
-        if count > 500:
-            #count = 0
-            break
+        if count > 10000:
+            count = 0
+            # break
     camera.release()
     cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
-    main(tensorrt=False, cam_device=0, input_size=(480, 640))
+    main(tensorrt=False, cam_device=None, input_size=(480, 640))

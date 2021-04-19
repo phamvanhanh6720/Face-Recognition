@@ -1,5 +1,6 @@
 from queue import Queue
 import math
+import pickle
 from typing import Tuple, Optional
 
 
@@ -61,15 +62,8 @@ def track_queue(face_queue: Queue, queue_size=7) -> Tuple[bool, Optional[str], O
     return (False, None, None)
 
 
-def check_change(result_tracking, current_state) :
-    if current_state == result_tracking:
-        if current_state[2] is not None:
-            print("Dont push to web client: {}___{}".format(current_state[2], current_state[1]))
-        else:
-            print("Dont push to web client")
-    else:
-        current_state = result_tracking
-        if current_state[2] is not None:
-            print("Push to web client: {}___{}".format(current_state[2], current_state[1]))
-
-    return current_state
+def store_image(connector, room_id, student_id, image):
+    cursor = connector.cursor()
+    query = """INSERT INTO get_info(Room_id, Student_id, Image) VALUES(%s, %s, %s) """
+    cursor.execute(query, (room_id, student_id, pickle.dumps(image)))
+    cursor.close()

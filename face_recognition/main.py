@@ -56,13 +56,12 @@ def gstreamer_pipeline(
     )
 
 
-def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000,
-         score_threshold=0.6, cosin_threshold=0.4, padding_threshold=20):
+def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4, padding_threshold=20):
     db_info = {'user': 'postgres',
-               'password': 'postgres',
-               'host': 'localhost',
-               'port': '5432',
-               'database': 'Check'}
+		       'password': 'postgres',
+		       'host': '192.168.0.105',
+		       'port': '5432',
+		       'database': 'Check'}
 
     connector = psycopg2.connect(**db_info)
     # base configure
@@ -91,8 +90,8 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     current_state: Optional[tuple] = None
 
     # Camera Configure
-    # camera = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
-    camera = cv2.VideoCapture(0)
+    camera = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
+    # camera = cv2.VideoCapture(0)
     count = 0
 
     while True:
@@ -103,80 +102,78 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
             raise Exception('Frame size must be {}'.format(input_size))
 
         if not ret:
-            break
+		    break
 
         if count % 8 == 0:
-            start = time.time()
-            original_img = np.copy(frame)
-            start_d = time.time()
-            bounding_boxes = face_detector.detect(frame)
-            print("face detection time", time.time() - start_d)
-            remove_rows = list(np.where(bounding_boxes[:, 4] < score_threshold)[0])  # score_threshold
-            bounding_boxes = np.delete(bounding_boxes, remove_rows, axis=0)
+			start = time.time()
+			original_img = np.copy(frame)
+			start_d = time.time()
+			bounding_boxes = face_detector.detect(frame)
+			print("face detection time", time.time() - start_d)
+			remove_rows = list(np.where(bounding_boxes[:, 4] < score_threshold)[0])  # score_threshold
+			bounding_boxes = np.delete(bounding_boxes, remove_rows, axis=0)
 
-            if bounding_boxes.shape[0] != 0 and find_max_bbox(bounding_boxes,
-                                                              area_threshold=area_threshold) is not None:
-                max_bbox = find_max_bbox(bounding_boxes)
+			if bounding_boxes.shape[0] != 0 and find_max_bbox(bounding_boxes, area_threshold=area_threshold) is not None:
+				max_bbox = find_max_bbox(bounding_boxes)
 
-                coordinate = [max_bbox[0], max_bbox[1], max_bbox[2], max_bbox[3]]  # x1, y1, x2, y2
-                x1, y1, x2, y2 = coordinate
-                if abs(x1) >= padding_threshold and abs(y1) >= padding_threshold and abs(
-                        im_width - abs(x2)) >= padding_threshold and abs(im_height - abs(y2)) >= padding_threshold:
-                    landmarks = [[max_bbox[2 * i - 1], max_bbox[2 * i]] for i in range(3, 8)]
+				coordinate = [max_bbox[0], max_bbox[1], max_bbox[2], max_bbox[3]]  # x1, y1, x2, y2
+				x1, y1, x2, y2 = coordinate
+				if abs(x1) >= padding_threshold and abs(y1) >= padding_threshold and abs(im_width - abs(x2)) >= padding_threshold and abs(im_height - abs(y2)) >= padding_threshold:
+					landmarks = [[max_bbox[2 * i - 1], max_bbox[2 * i]] for i in range(3, 8)]
 
-                    # Face Anti Spoofing
-                    # image_bbox: x_top_left, y_top_left, width, height
-                    image_bbox = [int(max_bbox[0]), int(max_bbox[1]),
-                                  int(max_bbox[2] - max_bbox[0]), int(max_bbox[3] - max_bbox[1])]
-                    spoof = detect_spoof(model_spoofing, image_bbox, original_img)
+					# Face Anti Spoofing
+					# image_bbox: x_top_left, y_top_left, width, height
+					image_bbox = [int(max_bbox[0]), int(max_bbox[1]),
+								  int(max_bbox[2] - max_bbox[0]), int(max_bbox[3] - max_bbox[1])]
+					spoof = detect_spoof(model_spoofing, image_bbox, original_img)
 
-                    # Get extract_feature
-                    warped_face2 = warp_and_crop_face(
-                        cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
+					# Get extract_feature
+					warped_face2 = warp_and_crop_face(
+						cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), landmarks, reference, (112, 112))
 
-                    obj_base64string = codecs.encode(
-                        pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
-                    # url = 'http://127.0.0.1:8000/recognition'
-                    url = 'http://42.114.166.123:14210/recognition'
-                    my_input = {'input':
-                                    {'image': obj_base64string, 'use_base64': False, 'image_size': 112,
-                                     'threshold': 0.4}}
-                    result = requests.post(url, json=my_input)
-                    result = result.json()
-                    cosin = result['similarity']
-                    name = result['name']
+					obj_base64string = codecs.encode(
+						pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
+					# url = 'http://127.0.0.1:8000/recognition'
+					url = 'http://42.114.166.123:14210/recognition'
+					my_input = {'input':
+									{'image': obj_base64string, 'use_base64': False, 'image_size': 112,
+									 'threshold': 0.4}}
+					result = requests.post(url, json=my_input)
+					result = result.json()
+					cosin = result['similarity']
+					name = result['name']
 
-                    # Draw box
-                    draw_box(frame, coordinate, cosin, name, spoof)
+					# Draw box
+					draw_box(frame, coordinate, cosin, name, spoof)
 
-                    faces_queue.put({'label': name, 'spoof': spoof})
+					faces_queue.put({'label': name, 'spoof': spoof})
 
-            else:
-                faces_queue.put({'label': "None", 'spoof': 0})
+			else:
+				faces_queue.put({'label': "None", 'spoof': 0})
 
-            result_tracking = track_queue(faces_queue)
-            if current_state == result_tracking:
-                if current_state[2] is not None:
-                    print("Dont push to web client: {}___{}".format(current_state[2], current_state[1]))
-                else:
-                    print("Dont push to web client")
-            else:
-                current_state = result_tracking
-                if current_state[2] is not None:
+			result_tracking = track_queue(faces_queue)
+			if current_state == result_tracking:
+				if current_state[2] is not None:
+					print("Dont push to web client: {}___{}".format(current_state[2], current_state[1]))
+				else:
+					print("Dont push to web client")
+			else:
+				current_state = result_tracking
+				if current_state[2] is not None:
 					print("Push to web client: {}___{}".format(current_state[2], current_state[1]))
-                    resize_img = cv2.resize(original_img, (0, 0), fx=0.5, fy=0.5)
+					resize_img = cv2.resize(original_img, (0, 0), fx=0.5, fy=0.5)
 					student_id = 1
 					room_id = 1101
 					store_image(connector, room_id=room_id, student_id=student_id, image=resize_img)
 
-            if len(faces_queue.queue) >= 7:
-                faces_queue.get()
+			if len(faces_queue.queue) >= 7:
+            	faces_queue.get()
 
-            cv2.imshow('frame', frame)
+			cv2.imshow('frame', frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-            print('Time frame ', time.time() - start)
+			if cv2.waitKey(1) & 0xFF == ord('q'):
+            	break
+        	print('Time frame ', time.time() - start)
         count += 1
         if count > 10000:
             count = 0
@@ -185,4 +182,4 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
 
 if __name__ == '__main__':
-    main(tensorrt=False, cam_device=None, input_size=(480, 640))
+	main(tensorrt=True, cam_device=None, input_size=(480, 640))

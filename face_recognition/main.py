@@ -1,4 +1,5 @@
 import time
+import asyncio
 import warnings
 from queue import Queue
 from typing import List, Optional, Tuple
@@ -7,9 +8,9 @@ import cv2
 import torch
 import codecs
 import pickle
-import psycopg2
 import numpy as np
 import requests
+from databases import Database
 
 from face_recognition.utils import draw_box
 from face_recognition.utils import find_max_bbox, Cfg, download_weights
@@ -51,14 +52,11 @@ def gstreamer_pipeline(
     )
 
 
-def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=10000, score_threshold=0.6, cosin_threshold=0.4, padding_threshold=20):
-    db_info = {'user': 'postgres',
-               'password': 'postgres',
-               'host': '192.168.0.105',
-               'port': '5432',
-               'database': 'Check'}
+async def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=12000,
+               score_threshold=0.6, cosin_threshold=0.4, padding_threshold=5):
 
-    connector = psycopg2.connect(**db_info)
+    database = Database('postgresql://postgres:postgres@192.168.1.10:5432/Check')
+    await database.connect()
     # base configure
     cpu = not torch.cuda.is_available()
     device = torch.device('cpu' if cpu else 'cuda:0')
@@ -85,8 +83,9 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
     current_state: Optional[tuple] = None
 
     # Camera Configure
-    camera = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
-    # camera = cv2.VideoCapture(0)
+    # camera = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
+    url_cam = 'http://192.168.1.14:4747/video'
+    camera = cv2.VideoCapture(url_cam)
     count = 0
 
     while True:
@@ -99,7 +98,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
         if not ret:
             break
 
-        if count % 8 == 0:
+        if count % 6 == 0:
             start = time.time()
             original_img = np.copy(frame)
             start_d = time.time()
@@ -113,7 +112,8 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
                 coordinate = [max_bbox[0], max_bbox[1], max_bbox[2], max_bbox[3]]  # x1, y1, x2, y2
                 x1, y1, x2, y2 = coordinate
-                if abs(x1) >= padding_threshold and abs(y1) >= padding_threshold and abs(im_width - abs(x2)) >= padding_threshold and abs(im_height - abs(y2)) >= padding_threshold:
+                if abs(x1) >= padding_threshold and abs(y1) >= padding_threshold and\
+                        abs(im_width - abs(x2)) >= padding_threshold and abs(im_height - abs(y2)) >= padding_threshold:
                     landmarks = [[max_bbox[2 * i - 1], max_bbox[2 * i]] for i in range(3, 8)]
 
                     # Face Anti Spoofing
@@ -128,7 +128,7 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
 
                     obj_base64string = codecs.encode(
                         pickle.dumps(warped_face2, protocol=pickle.HIGHEST_PROTOCOL), "base64").decode('utf-8')
-                    # url = 'http://127.0.0.1:8000/recognition'
+
                     url = 'http://42.114.166.123:14210/recognition'
                     my_input = {'input':
                                     {'image': obj_base64string, 'use_base64': False, 'image_size': 112,
@@ -157,24 +157,29 @@ def main(tensorrt: bool, cam_device: Optional[int], input_size: Tuple[int, int],
                 if current_state[2] is not None:
                     print("Push to web client: {}___{}".format(current_state[2], current_state[1]))
                     resize_img = cv2.resize(original_img, (0, 0), fx=0.5, fy=0.5)
-                    student_id = 1
-                    room_id = 1101
-                    store_image(connector, room_id=room_id, student_id=student_id, image=resize_img)
+                    student_id = name
+                    room_id = str(1109)
+                    await store_image(database, room_id=room_id, student_id=student_id, image=resize_img)
 
             if len(faces_queue.queue) >= 7:
                 faces_queue.get()
 
-        cv2.imshow('frame', frame)
+            cv2.imshow('frame', frame)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    print('Time frame ', time.time() - start)
-    count += 1
-    if count > 10000:
-        count = 0
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            print('Time frame ', time.time() - start)
+        count += 1
+        if count > 10000:
+            count = 0
+
+    # Disconnect database
+    await database.disconnect()
     camera.release()
     cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
-    main(tensorrt=True, cam_device=None, input_size=(480, 640))
+    futures = [main(tensorrt=True, cam_device=None, input_size=(480, 640))]
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(asyncio.wait(futures))

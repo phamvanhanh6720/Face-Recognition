@@ -2,6 +2,7 @@ from queue import Queue
 import math
 import pickle
 from typing import Tuple, Optional
+from databases import Database
 
 
 def track_queue(face_queue: Queue, queue_size=7) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -62,8 +63,9 @@ def track_queue(face_queue: Queue, queue_size=7) -> Tuple[bool, Optional[str], O
     return (False, None, None)
 
 
-def store_image(connector, room_id, student_id, image):
-    cursor = connector.cursor()
-    query = """INSERT INTO get_info(Room_id, Student_id, Image) VALUES(%s, %s, %s) """
-    cursor.execute(query, (room_id, student_id, pickle.dumps(image)))
-    cursor.close()
+async def store_image(database: Database, room_id, student_id, image):
+
+    query = """INSERT INTO get_info(Room_id, Student_id, Image) VALUES(:room_id, :student_id, :image)"""
+    values = {"room_id": room_id, "student_id": student_id, "image": pickle.dumps(image)}
+    await database.execute(query=query, values=values)
+

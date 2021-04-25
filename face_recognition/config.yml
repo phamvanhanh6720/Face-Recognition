@@ -6,6 +6,9 @@ weights:
     face_detections:
         FaceDetector_480_onnx: https://drive.google.com/uc?id=1MR74pqVy15lyG466CXIkYwS3sHel9ydX&export=download
         FaceDetector_pytorch: https://drive.google.com/uc?id=1n8hT9dHSU5ELUMlrkJP9_qi79KXKMjEu&export=download
+        file_config: https://drive.google.com/uc?id=1f2nOlpp4dt-uMDD-D_EG7MZiULBwp8op&export=download
+        caffe_weight: https://drive.google.com/uc?id=1v61tyPH5Jl2eceOF7FgM6gTxjlrVTsLL&export=download
+        landmark_weight: https://drive.google.com/uc?id=1VhYhno-sMkOojEoXYqkQP1LL6ZCyPfy-&export=download
     embedding_models:
         ArcFace_R50_onnx: https://drive.google.com/uc?id=117NH1r0bJQs3q88KKNU3X7-6RTtLQHCe&export=download
         ArcFace_pytorch: https://drive.google.com/uc?id=1hFfWEd44jXSqBTywl2KoVx6i8vZZbS7l&export=download
@@ -14,10 +17,10 @@ weights:
         4_0_0_80x80_MiniFASNetV1SE: https://drive.google.com/uc?id=17kxrVKy4G_y-FKM0PNxIFh32mOTQR_cx&export=download
 
 postgres_db:
-  host: 192.168.1.7
+  host: 192.168.1.10
   user: postgres
   password: postgres
-  database: FaceRecognition_Project
+  database: Check
   port: 5432
 
 init_db: createdatabase.sql

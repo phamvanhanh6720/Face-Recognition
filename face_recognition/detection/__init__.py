@@ -1,2 +1,2 @@
-from .FaceDetector import FaceDetector
-from .load_model import detection_model
+from .Detection import Detection
+from .utils import BBox

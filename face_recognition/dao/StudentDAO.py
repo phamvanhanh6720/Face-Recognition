@@ -72,17 +72,17 @@ class StudentDAO:
 
         try:
             if ids_list is None:
-                query = 'SELECT name, embeddings FROM datasets'
+                query = 'SELECT id, embeddings FROM datasets'
                 cursor.execute(query)
             else:
-                query = 'SELECT name, embeddings FROM datasets WHERE id IN %s'
+                query = 'SELECT id, embeddings FROM datasets WHERE id IN %s'
                 cursor.execute(query, (tuple(ids_list),))
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
 
         rows = cursor.fetchall()
         for row in rows:
-            name = row[0]
+            name = str(row[0])
             embedding = pickle.loads(row[1])
             for i in range(embedding.shape[0]):
                 name_list.append(name)

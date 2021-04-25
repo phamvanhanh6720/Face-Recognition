@@ -1,4 +1,32 @@
+import os
+
 import cv2
+import gdown
+
+
+def is_chosen(bbox, area_threshold=None) -> bool:
+    """
+    Calculate area of bounding boxes and return True if area >= threshold
+
+    Args:
+        bbox: (x1, y1, width, heigh)
+        area_threshold:
+
+    Returns:
+        True/False
+    """
+    are = bbox[2] * bbox[3]
+
+    if area_threshold is not None:
+        if are < area_threshold:
+            return False
+
+    return True
+
+
+def download_weights(url, cache=None, md5=None, quiet=False):
+
+    return os.path.join(gdown.cached_download(url, path=cache, md5=md5, quiet=quiet))
 
 
 def draw_border(img, pt1, pt2, color, thickness, r, d):

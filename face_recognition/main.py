@@ -8,6 +8,7 @@ import cv2
 import torch
 import onnx
 import numpy as np
+from torch2trt import torch2trt
 from databases import Database
 from torchvision import transforms
 import onnx_tensorrt.backend as backend
@@ -20,6 +21,7 @@ from face_recognition.detection import Detection
 from face_recognition.align import warp_and_crop_face, get_reference_facial_points
 from face_recognition.anti_spoofing import detect_spoof, AntiSpoofPredict
 from face_recognition.dao import StudentDAO
+from face_recognition.extract_feature import IR_50
 
 # Turn off warnming
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -63,10 +65,18 @@ async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_thre
         model_spoofing[model_name] = AntiSpoofPredict(model_path=path)
 
     # Load Embedding Model
-    model_path = download_weights(config['weights']['embedding_models']['ArcFace_R50_onnx'])
-    model_arcface = onnx.load(model_path)
-    arcface_engine = backend.prepare(model_arcface, device='CUDA:0')
-    del model_arcface
+    device = torch.device('cuda')
+    arcface_path = download_weights(config['weights']['embedding_models']['ArcFace_pytorch'])
+    arcface_r50_asian = IR_50(input_size=[112, 112])
+    arcface_r50_asian.load_state_dict(torch.load(arcface_path, map_location=device))
+    arcface_r50_asian.eval()
+    arcface_r50_asian.to(device=device)
+
+    x = torch.ones((1, 3, 112, 112), device=device)
+    arcface_r50_asian_trt = torch2trt(arcface_r50_asian, [x])
+    del x
+    del arcface_r50_asian
+    torch.cuda.empty_cache()
 
     # Queue for tracking face
     faces_queue = Queue(maxsize=7)
@@ -105,10 +115,12 @@ async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_thre
                     warped_face2 = warp_and_crop_face(
                         cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), facial5landmarks, reference, (112, 112))
 
-                    input_embedding = preprocess(warped_face2).numpy()
-                    input_embedding = np.expand_dims(input_embedding, axis=0)
+                    input_embedding = preprocess(warped_face2)
+                    input_embedding = torch.unsqueeze(input_embedding, 0)
+                    input_embedding = input_embedding.to(device)
 
-                    embedding = arcface_engine.run(input_embedding)[0]
+                    embedding: torch.Tensor = arcface_r50_asian_trt(input_embedding)
+                    embedding = embedding.detach().cpu().numpy() if embedding.requires_grad else embedding.cpu().numpy()
 
                     # Calculate similarity
                     similarity = cosine_similarity(embedding, X)

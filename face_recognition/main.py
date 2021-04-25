@@ -65,6 +65,7 @@ async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_thre
         model_spoofing[model_name] = AntiSpoofPredict(model_path=path)
 
     # Load Embedding Model
+    print("Load Embedding Model")
     device = torch.device('cuda')
     arcface_path = download_weights(config['weights']['embedding_models']['ArcFace_pytorch'])
     arcface_r50_asian = IR_50(input_size=[112, 112])
@@ -85,7 +86,7 @@ async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_thre
     # Camera Configure
     # camera = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
     url_cam = 'http://192.168.1.9:4747/video'
-    camera = cv2.VideoCapture(url_cam)
+    camera = cv2.VideoCapture(cam_device)
     count = 0
 
     while True:

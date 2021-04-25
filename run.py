@@ -2,6 +2,6 @@ from face_recognition import main
 import asyncio
 
 if __name__ == '__main__':
-    futures = [main(tensorrt=True, cam_device=None, input_size=(480, 640))]
+    futures = [main(cam_device=0, input_size=(480, 640))]
     loop = asyncio.get_event_loop()
     loop.run_until_complete(asyncio.wait(futures))

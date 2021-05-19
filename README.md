@@ -22,7 +22,7 @@
 
 <!-- ABOUT THE PROJECT -->
 <h2 id="#about-the-project">About The Project</h2>
-I deployment face recognition on jetson and build a database to load and
+I deployment face recognition on jetson nano and build a database to load and
 record the attendance of people. 
 
 <!-- GETTING STARTED -->
@@ -52,6 +52,7 @@ To get a local copy up and running follow these simple steps.
 <!-- USAGE EXAMPLES -->
 <h2 id="#details">Details</h2>
 <h3 id="#model"> Model </h3>
+
 * I use the [pre-trained model](https://github.com/ZhaoJ9014/face.evoLVe.PyTorch#Model-Zoo) to extract embedding of a face image and
 use cosine similarity between extracted embedding and other
 stored embeddings in the system. After that, I choose a

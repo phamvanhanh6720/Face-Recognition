@@ -19,7 +19,7 @@ weights:
 postgres_db:
   host: 192.168.1.10
   user: postgres
-  password: postgres
+  password:
   database: Check
   port: 5432
 

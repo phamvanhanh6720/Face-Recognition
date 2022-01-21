@@ -10,7 +10,7 @@ weights:
         caffe_weight: https://drive.google.com/uc?id=1v61tyPH5Jl2eceOF7FgM6gTxjlrVTsLL&export=download
         landmark_weight: https://drive.google.com/uc?id=1VhYhno-sMkOojEoXYqkQP1LL6ZCyPfy-&export=download
     embedding_models:
-        ArcFace_R50_onnx: https://drive.google.com/uc?id=117NH1r0bJQs3q88KKNU3X7-6RTtLQHCe&export=download
+        # ArcFace_R50_onnx: https://drive.google.com/uc?id=117NH1r0bJQs3q88KKNU3X7-6RTtLQHCe&export=download
         ArcFace_pytorch: https://drive.google.com/uc?id=1hFfWEd44jXSqBTywl2KoVx6i8vZZbS7l&export=download
     anti_spoof_models:
         2.7_80x80_MiniFASNetV2: https://drive.google.com/uc?id=1e0KTD1ri8tz6kog1YuR80oeOCh9Cpmfm&export=download

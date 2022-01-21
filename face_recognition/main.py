@@ -11,7 +11,6 @@ import numpy as np
 from torch2trt import torch2trt
 from databases import Database
 from torchvision import transforms
-import onnx_tensorrt.backend as backend
 from sklearn.metrics.pairwise import cosine_similarity
 
 from face_recognition.utils import draw_box
@@ -32,7 +31,7 @@ preprocess = transforms.Compose([
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 
-async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=12000, cosin_threshold=0.4,
+async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_threshold=12000, cosine_threshold=0.4,
                padding_threshold=5):
     # base configure
     cpu = not torch.cuda.is_available()
@@ -84,8 +83,9 @@ async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_thre
 
     # Camera Configure
     # camera = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
-    url_cam = 'http://192.168.1.9:4747/video'
-    camera = cv2.VideoCapture(url_cam)
+    # url_cam = 'http://192.168.1.9:4747/video'
+    # camera = cv2.VideoCapture(url_cam)
+    camera = cv2.VideoCapture(0)
     count = 0
 
     while True:
@@ -127,7 +127,7 @@ async def main(cam_device: Optional[int], input_size: Tuple[int, int], area_thre
                     arg_max = np.argmax(similarity, axis=-1)
                     cosin = float(similarity[0, arg_max])
 
-                    if cosin < cosin_threshold:
+                    if cosin < cosine_threshold:
                         name = "unknown"
                     else:
                         name = names_list[arg_max[0]]

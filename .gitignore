@@ -11,3 +11,4 @@ weights
 /face_recognition/torch2trt/
 /venv/
 *.onnx
+.ipynb_checkpoints
